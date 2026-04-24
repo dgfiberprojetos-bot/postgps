@@ -24,10 +24,10 @@ html,body{background:var(--bg);color:var(--tx);font-family:'Syne',system-ui,-app
 /* fonts loaded async below */
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(245,166,35,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(245,166,35,.03) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;z-index:0}
 .app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 86px;background:var(--bg)}
-@media(min-width:520px){
-  body{background:#111}
-  .app{box-shadow:0 0 60px rgba(0,0,0,.5);min-height:100vh}
-  .tab-bar{max-width:480px;margin:0 auto;left:auto;right:auto;position:fixed;bottom:0;transform:none;width:480px;left:50%;margin-left:-240px}
+@media(min-width:500px){
+  body{background:#0d0d0d}
+  .app{box-shadow:0 0 40px rgba(0,0,0,.6);min-height:100vh}
+  .tab-bar{left:calc(50% - 240px);right:auto;width:480px}
 }
 /* TABS */
 .tab-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(10,14,23,.98);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--bd);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
