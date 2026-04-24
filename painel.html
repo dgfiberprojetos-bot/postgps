@@ -336,10 +336,29 @@ let currentBin = FIXED_BIN_ID;
 // ── INIT ──────────────────────────────────────────────────────────────
 function init(){
   map = L.map('map',{zoomControl:true}).setView([-2.45,-54.71],12);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
-    attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a> © <a href="https://carto.com">CARTO</a>',
-    subdomains:'abcd',maxZoom:19
-  }).addTo(map);
+  // Google Satellite
+  const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+    attribution:'© Google',maxZoom:21,maxNativeZoom:21
+  });
+  // Google Hybrid (satellite + roads/labels)
+  const hybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{
+    attribution:'© Google',maxZoom:21,maxNativeZoom:21
+  });
+  // Google Streets
+  const streets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+    attribution:'© Google',maxZoom:21,maxNativeZoom:21
+  });
+
+  // Default: hybrid (satellite + nomes)
+  hybrid.addTo(map);
+
+  // Layer control
+  const baseMaps = {
+    '🛰️ Satélite': satellite,
+    '🛰️ Satélite + Ruas': hybrid,
+    '🗺️ Mapa de Ruas': streets
+  };
+  L.control.layers(baseMaps, {}, {position:'topright'}).addTo(map);
   // Custom zoom control position
   map.zoomControl.setPosition('bottomright');
 
