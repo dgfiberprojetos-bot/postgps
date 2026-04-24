@@ -609,7 +609,12 @@ function goTab(t){
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
   document.getElementById('s-'+t).classList.add('on');
   document.getElementById('tb-'+t).classList.add('on');
-  if(t==='export')updStats();
+  if(t==='export') updStats();
+  if(t==='cadastro') {
+    // Only reset if no active draft banner showing
+    const hasDraft = document.getElementById('banDr').classList.contains('on');
+    if(!hasDraft) resetForm();
+  }
 }
 
 // TECH
@@ -735,7 +740,7 @@ function addPole(){
   toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
 }
 
-function resetForm(){
+function resetForm(){ clearDraftS();
   ['poleId','poleObs','lat','lng'].forEach(id=>SV(id,''));  onTypeChange();
   document.getElementById('gdot').className='gdot';
   document.getElementById('gtxt').textContent='Toque para capturar a localização';
