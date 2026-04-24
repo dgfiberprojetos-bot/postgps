@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e17">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- PosteGPS v4.1 - 2026-04-24 -->
+<title>PosteGPS</title>
+
+<!-- Preload libs so they get cached on first visit -->
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" as="script">
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" as="script">
+
+<style>
+:root{--bg:#0a0e17;--sf:#111827;--sf2:#1a2235;--bd:#1f2d45;--ac:#f5a623;--ac2:#e85d04;--gn:#22c55e;--rd:#ef4444;--bl:#3b82f6;--tx:#e2e8f0;--mu:#64748b;--r:14px;--tap:54px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--tx);font-family:'Syne',system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+/* fonts loaded async below */
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(245,166,35,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(245,166,35,.03) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 86px}
+/* TABS */
+.tab-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(10,14,23,.98);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--bd);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.tb{flex:1;background:none;border:none;color:var(--mu);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 4px;cursor:pointer;transition:color .2s;min-height:var(--tap)}
+.tb.on{color:var(--ac)}
+.tb .ti{font-size:23px;line-height:1}
+.tb .tl{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.tb.on .ti{filter:drop-shadow(0 0 7px rgba(245,166,35,.7))}
+/* LAYOUT */
+.ph{padding:18px 16px 6px;display:flex;align-items:center;justify-content:space-between}
+.ph h2{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.ph h2 span{color:var(--ac)}
+.badge{background:var(--sf2);border:1px solid var(--bd);border-radius:20px;padding:5px 14px;font-size:13px;color:var(--ac);font-family:'DM Mono','Courier New',monospace;font-weight:500}
+.scr{display:none;padding:6px 14px}
+.scr.on{display:block}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ac);margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.sl::before{content:'';display:block;width:3px;height:13px;background:var(--ac);border-radius:2px}
+/* BANNERS */
+.ban{border-radius:10px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:12px;font-family:'DM Mono','Courier New',monospace}
+.ban-off{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--rd);display:none}
+.ban-off.on{display:flex}
+.ban-dr{background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);color:var(--ac);display:none;justify-content:space-between}
+.ban-dr.on{display:flex}
+.ban-pwa{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:var(--bl);display:none;align-items:flex-start}
+.ban-pwa.on{display:flex}
+.bbn{background:none;border:1px solid currentColor;border-radius:6px;color:inherit;font-size:11px;font-family:'DM Mono','Courier New',monospace;padding:4px 10px;cursor:pointer;flex-shrink:0}
+/* INPUTS */
+.f{margin-bottom:12px}
+.f:last-child{margin-bottom:0}
+label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu);margin-bottom:6px;font-family:'DM Mono','Courier New',monospace}
+input[type=text],input[type=number],textarea,select{width:100%;background:var(--sf2);border:1.5px solid var(--bd);border-radius:10px;color:var(--tx);font-family:'DM Mono','Courier New',monospace;font-size:15px;padding:13px 14px;outline:none;transition:border-color .2s;-webkit-appearance:none;min-height:var(--tap)}
+input:focus,textarea:focus,select:focus{border-color:var(--ac)}
+textarea{resize:none;min-height:80px;font-size:14px}
+select option{background:var(--sf2)}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* TECH */
+.tc{display:flex;align-items:center;gap:10px;background:var(--sf2);border:1.5px solid var(--bd);border-radius:10px;padding:13px 14px;cursor:pointer;transition:border-color .2s;width:100%;text-align:left}
+.tc:active{border-color:var(--ac)}
+.tc .tci{font-size:22px}
+.tc .tcd{flex:1}
+.tc .tcl{font-size:10px;color:var(--mu);font-family:'DM Mono','Courier New',monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.tc .tcn{font-size:14px;font-weight:700;color:var(--tx)}
+.tc .tce{font-size:18px;color:var(--mu)}
+/* GPS */
+.btn-gps{width:100%;background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:12px;color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;padding:16px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;min-height:var(--tap);transition:transform .15s;margin-bottom:10px}
+.btn-gps:active{transform:scale(.97)}
+.btn-gps.ld{opacity:.7;pointer-events:none}
+.gstat{display:flex;align-items:center;gap:9px;background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:12px 13px;font-family:'DM Mono','Courier New',monospace;font-size:11px;line-height:1.5}
+.gdot{width:9px;height:9px;border-radius:50%;background:var(--mu);flex-shrink:0;transition:background .3s}
+.gdot.ok{background:var(--gn);box-shadow:0 0 8px var(--gn);animation:pulse 1.5s infinite}
+.gdot.er{background:var(--rd)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.mmap{margin-top:10px;height:160px;border-radius:10px;border:1px solid var(--bd);overflow:hidden;display:none;position:relative}
+.mmap iframe{width:100%;height:100%;border:none}
+.mpin{position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);font-size:26px;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.mok{display:none;align-items:center;gap:7px;margin-top:8px;padding:9px 12px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:8px;font-size:11px;color:var(--gn);font-family:'DM Mono','Courier New',monospace}
+.mok.on{display:flex}
+/* PHOTO PROGRESS */
+.pp{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.pp-bar{flex:1;height:5px;background:var(--sf2);border-radius:3px;overflow:hidden}
+.pp-fill{height:100%;border-radius:3px;transition:width .4s,background .3s;width:0%;background:var(--mu)}
+.pp-lbl{font-family:'DM Mono','Courier New',monospace;font-size:11px;white-space:nowrap;color:var(--mu)}
+/* PHOTO BLOCKS */
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pb{display:flex;flex-direction:column;gap:7px}
+.pv{position:relative;aspect-ratio:4/3;border-radius:10px;background:var(--sf2);border:2px dashed var(--bd);overflow:hidden;display:flex;align-items:center;justify-content:center;transition:border-color .2s}
+.pv.has{border-style:solid;border-color:var(--gn)}
+.pv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pe{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--mu);pointer-events:none}
+.pe .pei{font-size:30px}
+.pe .pet{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center;line-height:1.3}
+.ptag{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.75);color:var(--ac);font-family:'DM Mono','Courier New',monospace;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;z-index:2;pointer-events:none}
+.pck{position:absolute;top:6px;right:6px;background:var(--gn);width:22px;height:22px;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:13px;z-index:2;pointer-events:none}
+.pv.has .pck{display:flex}
+/* Photo action buttons */
+.pbtns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pbtn{background:var(--sf2);border:1.5px solid var(--bd);border-radius:9px;color:var(--tx);font-family:'Syne',sans-serif;font-weight:700;font-size:12px;padding:11px 4px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;min-height:44px;transition:border-color .15s,color .15s;-webkit-appearance:none;touch-action:manipulation}
+.pbtn:active{border-color:var(--ac);color:var(--ac);transform:scale(.97)}
+.pbtn-del{grid-column:span 2;background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.2);color:var(--rd);display:none}
+.pb.has .pbtn-del{display:flex}
+input[type=file]{display:none}
+/* ADD BTN */
+.btn-add{width:100%;background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:12px;color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:17px;padding:18px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;min-height:var(--tap);transition:transform .15s;margin-top:4px;touch-action:manipulation}
+.btn-add:active{transform:scale(.97)}
+/* LIST */
+.plist{display:flex;flex-direction:column;gap:10px}
+.pi{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start;animation:up .25s ease;cursor:pointer;transition:border-color .2s}
+.pi:active{border-color:var(--ac)}
+@keyframes up{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.pn{width:42px;height:42px;flex-shrink:0;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#000}
+.pbody{flex:1;min-width:0}
+.pbody h3{font-size:15px;font-weight:700;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmeta{font-family:'DM Mono','Courier New',monospace;font-size:11px;color:var(--mu);line-height:1.8}
+.ptags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.ptag2{display:inline-flex;align-items:center;gap:4px;border-radius:5px;font-size:10px;font-family:'DM Mono','Courier New',monospace;padding:2px 7px;border:1px solid}
+.ptag-t{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--bl)}
+.ptag-v{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:var(--gn)}
+.pstrip{display:flex;gap:5px;margin-top:8px}
+.pthumb{width:44px;height:44px;border-radius:7px;object-fit:cover;border:1px solid var(--bd)}
+.pdel{width:36px;height:36px;flex-shrink:0;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mu);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;transition:all .15s;align-self:center;touch-action:manipulation}
+.pdel:active{border-color:var(--rd);color:var(--rd)}
+.empty{text-align:center;padding:52px 20px;color:var(--mu)}
+.empty .ei{font-size:52px;margin-bottom:12px;opacity:.4}
+.empty p{font-size:14px;line-height:1.6}
+/* EXPORT */
+.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.sbox{background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:12px;text-align:center}
+.sn{font-size:26px;font-weight:800;color:var(--ac)}
+.slbl{font-size:10px;color:var(--mu);font-family:'DM Mono','Courier New',monospace;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.eo{background:var(--sf);border:1.5px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s;touch-action:manipulation}
+.eo:active{border-color:var(--ac);transform:scale(.98)}
+.ei2{width:48px;height:48px;flex-shrink:0;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.ei2.kmz{background:linear-gradient(135deg,var(--ac),var(--ac2))}
+.ei2.kml{background:var(--sf2);border:1px solid var(--bd)}
+.ei2.pdf{background:linear-gradient(135deg,#ef4444,#dc2626)}
+.ei2.csv{background:linear-gradient(135deg,#16a34a,#15803d)}
+.et h3{font-size:14px;font-weight:700;margin-bottom:2px}
+.et p{font-size:11px;color:var(--mu);line-height:1.4}
+.ea{margin-left:auto;color:var(--mu);font-size:20px}
+/* MODAL */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.mov.on{display:flex}
+.mod{background:var(--sf);border:1px solid var(--bd);border-radius:20px 20px 0 0;padding:20px 18px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+.mh{width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px}
+.mod h2{font-size:18px;font-weight:800;margin-bottom:14px}
+.mphotos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.mphotos img{width:100%;border-radius:10px;aspect-ratio:4/3;object-fit:cover;cursor:zoom-in}
+.mmap2{border-radius:10px;overflow:hidden;border:1px solid var(--bd);height:150px;margin-bottom:12px;display:none;position:relative}
+.mmap2 iframe{width:100%;height:100%;border:none}
+.minfo{font-family:'DM Mono','Courier New',monospace;font-size:12px;line-height:2.1;color:var(--mu)}
+.minfo strong{color:var(--tx)}
+.hlist{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.hi{background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+.hd{font-family:'DM Mono','Courier New',monospace;font-size:10px;color:var(--mu);margin-bottom:3px}
+.ht{font-size:12px;font-weight:600;margin-bottom:2px}
+.ho{font-size:11px;color:var(--mu)}
+.hphotos{display:flex;gap:5px;margin-top:6px}
+.hphotos img{width:40px;height:40px;border-radius:5px;object-fit:cover}
+.macts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.ma{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;color:var(--tx);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;padding:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;touch-action:manipulation}
+.ma:active{opacity:.7}
+.ma.full{grid-column:span 2}
+.ma.danger{border-color:rgba(239,68,68,.4);color:var(--rd)}
+/* TECH MODAL */
+.tov{position:fixed;inset:0;background:rgba(0,0,0,.87);backdrop-filter:blur(6px);z-index:300;display:none;align-items:flex-end;justify-content:center}
+.tov.on{display:flex}
+.tmod{background:var(--sf);border-radius:20px 20px 0 0;padding:24px 18px;width:100%;max-width:480px;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+.tmod h3{font-size:18px;font-weight:800;margin-bottom:16px}
+.tinp{width:100%;background:var(--sf2);border:1.5px solid var(--ac);border-radius:10px;color:var(--tx);font-family:'DM Mono','Courier New',monospace;font-size:16px;padding:14px;outline:none;margin-bottom:12px;min-height:var(--tap)}
+.tsave{width:100%;background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:12px;color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;padding:15px;cursor:pointer;min-height:var(--tap);touch-action:manipulation}
+/* TOAST */
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--sf);border:1px solid var(--bd);border-radius:30px;padding:11px 22px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:500;white-space:nowrap;max-width:90vw}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:var(--gn);color:var(--gn)}
+.toast.er{border-color:var(--rd);color:var(--rd)}
+.toast.info{border-color:var(--ac);color:var(--ac)}
+</style>
+<!-- Load fonts async so offline mode is not blocked -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+</head>
+<body>
+<div class="app">
+
+<!-- ════ NOVO POSTE ════ -->
+<div class="scr on" id="s-cadastro">
+  <div class="ph"><h2>Novo <span>Poste</span></h2></div>
+
+  <div class="ban ban-off" id="banOff"><span>📵 Sem conexão — dados salvos localmente</span></div>
+  <div class="ban ban-dr" id="banDr">
+    <span>⚡ Rascunho recuperado</span>
+    <button class="bbn" onclick="clearDraft()">Limpar</button>
+  </div>
+  <div class="ban ban-pwa" id="banPwa">
+    <span style="flex:1">📱 <b>Instalar para usar offline:</b><br>Android: ⋮ → "Instalar app"<br>iPhone: compartilhar ↑ → "Tela de Início"</span>
+    <button class="bbn" onclick="closePwa()" style="align-self:flex-start">✕</button>
+  </div>
+
+  <!-- Técnico -->
+  <div class="card">
+    <div class="sl">👤 Técnico Responsável</div>
+    <button class="tc" onclick="openTMod()">
+      <span class="tci">👷</span>
+      <div class="tcd">
+        <div class="tcl">Responsável</div>
+        <div class="tcn" id="techDisp">Toque para identificar</div>
+      </div>
+      <span class="tce">✏️</span>
+    </button>
+  </div>
+
+  <!-- GPS -->
+  <div class="card">
+    <div class="sl">📍 Localização GPS</div>
+    <button class="btn-gps" id="btnGPS" onclick="getGPS()">
+      <span style="font-size:20px">📍</span> Capturar GPS Agora
+    </button>
+    <div class="gstat"><div class="gdot" id="gdot"></div><span id="gtxt">Toque para capturar a localização</span></div>
+    <div class="r2" style="margin-top:12px">
+      <div class="f"><label>Latitude</label><input type="number" id="lat" placeholder="-2.4483" step="0.000001" oninput="onCC()"></div>
+      <div class="f"><label>Longitude</label><input type="number" id="lng" placeholder="-54.708" step="0.000001" oninput="onCC()"></div>
+    </div>
+    <div class="mmap" id="mmap"><iframe id="mmf" src="" allowfullscreen loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe><div class="mpin">📍</div><div class="map-offline" id="mapOfflineMsg" style="display:none;position:absolute;inset:0;background:var(--sf2);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-family:'DM Mono','Courier New',monospace;font-size:12px;color:var(--mu);text-align:center;padding:16px"><div style="font-size:32px">📍</div><div id="mapOfflineCoords" style="color:var(--ac);font-size:13px;font-weight:700"></div><div>Mapa indisponível offline</div></div></div>
+    <div class="mok" id="mok">✅ &nbsp;Localização confirmada no mapa</div>
+    <div id="addrWrap" style="display:none;margin-top:8px;padding:9px 13px;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;color:var(--tx)" id="addrWrap"><span id="addrDisp"></span></div>
+  </div>
+
+  <!-- Dados -->
+  <div class="card">
+    <div class="sl">📋 Dados do Poste</div>
+    <div class="f"><label>ID / Número</label><input type="text" id="poleId" placeholder="Ex: P-001" autocomplete="off" autocorrect="off" oninput="saveDraft()"></div>
+    <div class="f"><label>Tipo</label>
+      <select id="poleType" onchange="onTypeChange()">
+        <option value="Concreto">Concreto</option>
+        <option value="Metálico">Metálico</option>
+        <option value="Madeira">Madeira</option>
+        <option value="Fibra de Vidro">Fibra de Vidro</option>
+        <option value="Poste com Transformador">Poste com Transformador</option>
+      </select>
+    </div>
+    <div class="f" id="modelField">
+      <label>Modelo do Poste</label>
+      <select id="poleModel" onchange="saveDraft()">
+        <option value="">— Selecione o modelo —</option>
+      </select>
+    </div>
+    <div class="f"><label>Observação (opcional)</label><textarea id="poleObs" placeholder="Estado de conservação, anomalias..." oninput="saveDraft()"></textarea></div>
+  </div>
+
+  <!-- Fotos -->
+  <div class="card">
+    <div class="sl">📷 Fotos do Poste</div>
+    <div class="pp">
+      <span class="pp-lbl" id="ppC">0 / 2 fotos</span>
+      <div class="pp-bar"><div class="pp-fill" id="ppF"></div></div>
+      <span class="pp-lbl" id="ppS" style="color:var(--mu)">Adicione as fotos</span>
+    </div>
+    <div class="pgrid">
+
+      <!-- FOTO 1 -->
+      <div class="pb" id="pb1">
+        <div class="pv" id="pv1">
+          <div class="ptag">FOTO 1</div>
+          <div class="pe" id="pe1"><div class="pei">🖼</div><div class="pet">Sem foto</div></div>
+          <div class="pck">✓</div>
+        </div>
+        <div class="pbtns">
+          <button class="pbtn" onclick="document.getElementById('c1').click()">📸 Câmera</button>
+          <button class="pbtn" onclick="document.getElementById('g1').click()">🖼 Galeria</button>
+          <button class="pbtn pbtn-del" onclick="rmPhoto(1)">🗑 Remover</button>
+        </div>
+      </div>
+
+      <!-- FOTO 2 -->
+      <div class="pb" id="pb2">
+        <div class="pv" id="pv2">
+          <div class="ptag">FOTO 2</div>
+          <div class="pe" id="pe2"><div class="pei">🖼</div><div class="pet">Sem foto</div></div>
+          <div class="pck">✓</div>
+        </div>
+        <div class="pbtns">
+          <button class="pbtn" onclick="document.getElementById('c2').click()">📸 Câmera</button>
+          <button class="pbtn" onclick="document.getElementById('g2').click()">🖼 Galeria</button>
+          <button class="pbtn pbtn-del" onclick="rmPhoto(2)">🗑 Remover</button>
+        </div>
+      </div>
+
+    </div>
+    <input type="file" id="c1" accept="image/*" capture="environment" onchange="loadPhoto(event,1)">
+    <input type="file" id="g1" accept="image/*" onchange="loadPhoto(event,1)">
+    <input type="file" id="c2" accept="image/*" capture="environment" onchange="loadPhoto(event,2)">
+    <input type="file" id="g2" accept="image/*" onchange="loadPhoto(event,2)">
+  </div>
+
+  <button class="btn-add" onclick="addPole()">＋ Salvar Poste</button>
+</div>
+
+<!-- ════ LISTA ════ -->
+<div class="scr" id="s-lista">
+  <div class="ph"><h2>Postes <span>Cadastrados</span></h2><div class="badge" id="cntBadge">0</div></div>
+  <div style="padding:4px 0"><div class="plist" id="pList"><div class="empty"><div class="ei">🔆</div><p>Nenhum poste.<br>Toque em "Novo" para começar.</p></div></div></div>
+</div>
+
+<!-- ════ EXPORTAR ════ -->
+<div class="scr" id="s-export">
+  <div class="ph"><h2>Exportar <span>Dados</span></h2></div>
+  <div style="margin-bottom:12px;padding:12px 14px;background:var(--sf);border:1px solid var(--bd);border-radius:10px;font-family:'DM Mono',monospace;font-size:11px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span id="syncStatus" style="color:var(--mu)">☁️ Aguardando sincronização...</span>
+      <button onclick="pullFromCloud();pushToCloud();toast('🔄 Sincronizando...','info')" style="background:var(--ac);border:none;border-radius:6px;color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;padding:5px 10px;cursor:pointer">Sincronizar</button>
+    </div>
+    <div style="color:var(--mu);font-size:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">ID para o painel supervisor:</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <div id="binIdDisp" style="flex:1;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--ac);font-size:11px;word-break:break-all">Aguardando primeiro sync...</div>
+      <button onclick="copyBinId()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:18px;padding:6px 10px;cursor:pointer;flex-shrink:0">📋</button>
+    </div>
+  </div>
+  <div class="sgrid">
+    <div class="sbox"><div class="sn" id="stP">0</div><div class="slbl">Postes</div></div>
+    <div class="sbox"><div class="sn" id="stF">0</div><div class="slbl">Fotos</div></div>
+    <div class="sbox"><div class="sn" id="stT">0</div><div class="slbl">Técnicos</div></div>
+  </div>
+  <div class="eo" onclick="exportKMZ()"><div class="ei2 kmz">📦</div><div class="et"><h3>Exportar KMZ</h3><p>Fotos embutidas • Google Earth</p></div><div class="ea">›</div></div>
+  <div class="eo" onclick="exportKML()"><div class="ei2 kml">📄</div><div class="et"><h3>Exportar KML</h3><p>Somente coordenadas</p></div><div class="ea">›</div></div>
+  <div class="eo" onclick="exportPDF()"><div class="ei2 pdf">📋</div><div class="et"><h3>Relatório PDF</h3><p>Relatório completo com fotos</p></div><div class="ea">›</div></div>
+  <div class="eo" onclick="exportCSV()"><div class="ei2 csv">📊</div><div class="et"><h3>Exportar CSV</h3><p>Planilha • Excel, Google Sheets</p></div><div class="ea">›</div></div>
+  <div class="card"><div class="sl">ℹ️ Sobre os dados</div>
+    <p style="font-size:12px;color:var(--mu);line-height:1.9;font-family:'DM Mono','Courier New',monospace">
+      Dados salvos <strong style="color:var(--tx)">automaticamente</strong> no celular.<br>
+      Funciona <strong style="color:var(--tx)">sem internet</strong> após instalar.<br>
+      <strong style="color:var(--tx)">KMZ</strong> abre no Google Earth com fotos.<br>
+      <strong style="color:var(--tx)">PDF</strong> para enviar ao cliente.<br>
+      <strong style="color:var(--tx)">CSV</strong> abre no Excel e Google Sheets.
+    </p>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tb on" id="tb-cadastro" onclick="goTab('cadastro')"><span class="ti">＋</span><span class="tl">Novo</span></button>
+  <button class="tb" id="tb-lista" onclick="goTab('lista')"><span class="ti">📋</span><span class="tl">Lista</span></button>
+  <button class="tb" id="tb-export" onclick="goTab('export')"><span class="ti">📦</span><span class="tl">Exportar</span></button>
+</div>
+
+<!-- MODAL DETALHE -->
+<div class="mov" id="mov" onclick="if(event.target===this)closeMod()">
+  <div class="mod">
+    <div class="mh"></div>
+    <h2 id="mTit"></h2>
+    <div class="mphotos" id="mPh"></div>
+    <div class="mmap2" id="mmap2"><iframe id="mmf2" src="" allowfullscreen loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe><div class="map-offline" id="mapOfflineMsg2" style="display:none;position:absolute;inset:0;background:var(--sf2);flex-direction:column;align-items:center;justify-content:center;gap:8px;font-family:'DM Mono','Courier New',monospace;font-size:12px;color:var(--mu);text-align:center;padding:16px"><div style="font-size:32px">📍</div><div id="mapOfflineCoords2" style="color:var(--ac);font-size:13px;font-weight:700"></div><div>Mapa indisponível offline</div></div></div>
+    <div class="minfo" id="mInfo"></div>
+    <div id="mHW" style="display:none">
+      <div class="sl" style="margin-top:16px">📅 Histórico de Visitas</div>
+      <div class="hlist" id="mH"></div>
+    </div>
+    <div class="macts">
+      <button class="ma" onclick="openMaps()">🗺 Ver no Maps</button>
+      <button class="ma" onclick="addVisit()">➕ Nova Visita</button>
+      <button class="ma full danger" onclick="confirmDel()">🗑 Remover Poste</button>
+      <button class="ma full" onclick="closeMod()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TÉCNICO -->
+<div class="tov" id="tov" onclick="if(event.target===this)closeTMod()">
+  <div class="tmod">
+    <div class="mh"></div>
+    <h3>👷 Identificação do Técnico</h3>
+    <input class="tinp" id="tinp" type="text" placeholder="Digite seu nome completo" autocomplete="off">
+    <button class="tsave" onclick="saveTech()">✓ Confirmar</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// Offline caching handled by browser
+
+
+// ══════════════════════════════════════════════
+// JSONBIN SYNC CONFIG
+// ══════════════════════════════════════════════
+const JKEY = '$2a$10$AsRx5rC8JX7R/Hvab5G9VOh4H47/tSun0quWwboI9eDZ7VMOG8CDW';
+const JBASE = 'https://api.jsonbin.io/v3';
+let BIN_ID = localStorage.getItem('pgps_bin') || null;
+let syncTimer = null;
+
+async function ensureBin() {
+  if(BIN_ID) return BIN_ID;
+  try {
+    const r = await fetch(JBASE+'/b', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Master-Key':JKEY,'X-Bin-Name':'postgps-data','X-Bin-Private':'false'},
+      body: JSON.stringify({poles:[],version:1})
+    });
+    const d = await r.json();
+    BIN_ID = d.metadata.id;
+    localStorage.setItem('pgps_bin', BIN_ID);
+    return BIN_ID;
+  } catch(e) { console.error('ensureBin',e); return null; }
+}
+
+async function pushToCloud() {
+  if(!navigator.onLine) return;
+  try {
+    const id = await ensureBin();
+    if(!id) return;
+    const lite = poles.map(p => {
+      const {photos,...rest} = p;
+      return {...rest, hasPhotos: photos.filter(Boolean).length};
+    });
+    await fetch(JBASE+'/b/'+id, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':JKEY},
+      body: JSON.stringify({poles:lite, lastUpdate: new Date().toISOString(), tech: tech})
+    });
+    const el=document.getElementById('syncStatus');
+    if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const binEl=document.getElementById('binIdDisp');
+    if(binEl && BIN_ID) binEl.textContent=BIN_ID;
+  } catch(e) { console.error('push',e); }
+}
+
+async function pullFromCloud() {
+  if(!navigator.onLine) return;
+  try {
+    const id = await ensureBin();
+    if(!id) return;
+    const r = await fetch(JBASE+'/b/'+id+'/latest', {
+      headers:{'X-Master-Key':JKEY}
+    });
+    const d = await r.json();
+    if(!d.record || !d.record.poles) return;
+    const cloudPoles = d.record.poles || [];
+    let added = 0;
+    for(const cp of cloudPoles) {
+      const exists = poles.find(p=>p.id===cp.id);
+      if(!exists) {
+        poles.push({...cp, photos:[null,null]});
+        added++;
+      }
+    }
+    if(added>0) {
+      save();
+      renderList();
+      toast('☁️ '+added+' poste(s) sincronizado(s)!','ok');
+    }
+    const el=document.getElementById('syncStatus');
+    if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const binEl=document.getElementById('binIdDisp');
+    if(binEl && BIN_ID) binEl.textContent=BIN_ID;
+  } catch(e) { console.error('pull',e); }
+}
+
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=>{ pushToCloud(); }, 2000);
+}
+
+// Auto-pull every 30s when online
+setInterval(()=>{ if(navigator.onLine) pullFromCloud(); }, 30000);
+
+function getNextId(){
+  if(!poles.length) return 'P-001';
+  const nums = poles.map(p=>{
+    const m = p.poleId.match(/(\d+)$/);
+    return m ? parseInt(m[1]) : 0;
+  });
+  const next = Math.max(...nums) + 1;
+  return 'P-' + String(next).padStart(3,'0');
+}
+
+async function getAddress(lat,lng){
+  try{
+    if(!navigator.onLine) return '';
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=pt-BR`,
+      {headers:{'User-Agent':'PosteGPS/1.0'}});
+    const d = await r.json();
+    if(!d.address) return '';
+    const a = d.address;
+    return [a.road||a.pedestrian||'', a.suburb||a.neighbourhood||a.quarter||'', a.city||a.town||a.village||'']
+      .filter(Boolean).join(', ');
+  }catch(e){ return ''; }
+}
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let poles=[], pd={1:null,2:null}, tech='', curId=null;
+
+function init(){  onTypeChange();
+  try{
+    const s=localStorage.getItem('pgps4');
+    if(s) poles=JSON.parse(s);
+    tech=localStorage.getItem('pgps_tech')||'';
+    if(tech) document.getElementById('techDisp').textContent=tech;
+    loadDraft();
+    renderList();
+    // Show install hint if not standalone
+    const sa=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone;
+    if(!sa&&!localStorage.getItem('pwa_closed'))
+      document.getElementById('banPwa').classList.add('on');
+  }catch(e){}
+  pullFromCloud();
+  window.addEventListener('offline',()=>document.getElementById('banOff').classList.add('on'));
+  window.addEventListener('online',()=>document.getElementById('banOff').classList.remove('on'));
+  if(!navigator.onLine) document.getElementById('banOff').classList.add('on');
+}
+function closePwa(){localStorage.setItem('pwa_closed','1');document.getElementById('banPwa').classList.remove('on');}
+function save(){try{localStorage.setItem('pgps4',JSON.stringify(poles));}catch(e){toast('⚠️ Memória cheia','er');}}
+
+// MODELOS POR TIPO
+const MODELS = {
+  'Concreto': [
+    'Circular 10/300',
+    'Circular 11/600',
+    'Duplo T 10/150',
+    'Duplo T 10/300',
+    'Duplo T 11/300',
+    'Duplo T 11/600'
+  ],
+  'Metálico': [
+    'Tubular Cônico',
+    'Treliçado',
+    'Perfil H'
+  ],
+  'Madeira': [
+    'Roliço Preservado',
+    'Tratado CCA'
+  ],
+  'Fibra de Vidro': [
+    'Cônico FV',
+    'Tubular FV'
+  ],
+  'Poste com Transformador': [
+    'Transformador 5 kVA',
+    'Transformador 10 kVA',
+    'Transformador 15 kVA',
+    'Transformador 25 kVA',
+    'Transformador 30 kVA',
+    'Transformador 45 kVA',
+    'Transformador 75 kVA',
+    'Transformador 112,5 kVA'
+  ]
+};
+
+function onTypeChange(){
+  const type = V('poleType');
+  const sel = document.getElementById('poleModel');
+  const models = MODELS[type] || [];
+  sel.innerHTML = '<option value="">— Selecione o modelo —</option>' +
+    models.map(m=>`<option value="${m}">${m}</option>`).join('');
+  saveDraft();
+}
+
+// DRAFT
+let dT;
+function saveDraft(){
+  clearTimeout(dT);
+  dT=setTimeout(()=>{
+    const d={id:V('poleId'),type:V('poleType'),model:V('poleModel'),obs:V('poleObs'),lat:V('lat'),lng:V('lng'),p1:pd[1],p2:pd[2]};
+    if(d.id||d.lat) localStorage.setItem('pgps_draft',JSON.stringify(d));
+  },700);
+}
+function loadDraft(){
+  try{
+    const raw=localStorage.getItem('pgps_draft');
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    if(!d.id&&!d.lat)return;
+    SV('poleId',d.id||'');SV('poleType',d.type||'Concreto');SV('poleObs',d.obs||'');SV('lat',d.lat||'');SV('lng',d.lng||'');
+    // Restore model: first populate options then set value
+    if(d.type) onTypeChange();
+    if(d.model) SV('poleModel',d.model);
+    if(d.p1){pd[1]=d.p1;applySlot(1,d.p1.data);}
+    if(d.p2){pd[2]=d.p2;applySlot(2,d.p2.data);}
+    if(d.lat&&d.lng){showMap(d.lat,d.lng);document.getElementById('gdot').className='gdot ok';document.getElementById('gtxt').textContent=`${parseFloat(d.lat).toFixed(5)}, ${parseFloat(d.lng).toFixed(5)}`;}
+    document.getElementById('banDr').classList.add('on');
+    updatePP();
+  }catch(e){}
+}
+function clearDraft(){localStorage.removeItem('pgps_draft');document.getElementById('banDr').classList.remove('on');resetForm();toast('🗑 Rascunho limpo','info');}
+function clearDraftS(){localStorage.removeItem('pgps_draft');document.getElementById('banDr').classList.remove('on');}
+
+// HELPERS
+function V(id){return document.getElementById(id).value;}
+function SV(id,v){document.getElementById(id).value=v;}
+
+// TABS
+function goTab(t){
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('s-'+t).classList.add('on');
+  document.getElementById('tb-'+t).classList.add('on');
+  if(t==='export')updStats();
+}
+
+// TECH
+function openTMod(){document.getElementById('tinp').value=tech;document.getElementById('tov').classList.add('on');setTimeout(()=>document.getElementById('tinp').focus(),250);}
+function closeTMod(){document.getElementById('tov').classList.remove('on');}
+function saveTech(){
+  const v=document.getElementById('tinp').value.trim();
+  if(!v){toast('⚠️ Digite o nome','er');return;}
+  tech=v;localStorage.setItem('pgps_tech',v);
+  document.getElementById('techDisp').textContent=v;
+  closeTMod();toast(`👷 Olá, ${v}!`,'ok');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('tov').classList.contains('on'))saveTech();});
+
+// GPS
+function getGPS(){
+  if(!navigator.geolocation){toast('GPS não suportado','er');return;}
+  const btn=document.getElementById('btnGPS'),dot=document.getElementById('gdot'),txt=document.getElementById('gtxt');
+  btn.classList.add('ld');btn.innerHTML='⏳ Aguarde...';dot.className='gdot';txt.textContent='Conectando ao GPS...';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const la=pos.coords.latitude.toFixed(6),ln=pos.coords.longitude.toFixed(6),ac=Math.round(pos.coords.accuracy);
+      SV('lat',la);SV('lng',ln);
+      dot.className='gdot ok';txt.textContent=`${la}, ${ln}  (±${ac}m)`;
+      btn.classList.remove('ld');btn.innerHTML='<span style="font-size:20px">✅</span> GPS Capturado — Toque para recapturar';
+      showMap(la,ln);saveDraft();toast('📍 Localização capturada!','ok');
+      // Auto-fill ID if empty
+      if(!document.getElementById('poleId').value){ SV('poleId', getNextId()); }
+      // Get address async
+      getAddress(la,ln).then(addr=>{ if(addr){ document.getElementById('addrDisp').textContent='📍 '+addr; document.getElementById('addrWrap').style.display='block'; } });
+    },
+    err=>{
+      const m={1:'Permissão negada. Ative nas configurações.',2:'Localização indisponível.',3:'Tempo esgotado.'};
+      dot.className='gdot er';txt.textContent=m[err.code]||'Erro';
+      btn.classList.remove('ld');btn.innerHTML='<span style="font-size:20px">📍</span> Tentar Novamente';
+      toast('❌ '+(m[err.code]||'Erro GPS'),'er');
+    },
+    {enableHighAccuracy:true,timeout:20000,maximumAge:0}
+  );
+}
+function onCC(){const la=V('lat'),ln=V('lng');if(la&&ln&&!isNaN(la)&&!isNaN(ln))showMap(la,ln);saveDraft();}
+function showMap(lat,lng){
+  const wrap = document.getElementById('mmap');
+  wrap.style.display='block';
+  document.getElementById('mok').classList.add('on');
+  const offMsg = document.getElementById('mapOfflineMsg');
+  const coords = document.getElementById('mapOfflineCoords');
+  if(navigator.onLine){
+    offMsg.style.display='none';
+    document.getElementById('mmf').src=`https://www.openstreetmap.org/export/embed.html?bbox=${(+lng-.002)},${(+lat-.002)},${(+lng+.002)},${(+lat+.002)}&layer=mapnik&marker=${lat},${lng}`;
+  } else {
+    document.getElementById('mmf').src='';
+    coords.textContent=`${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`;
+    offMsg.style.display='flex';
+  }
+}
+
+// PHOTOS
+function loadPhoto(e,n){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      const M=1200;let w=img.width,h=img.height;
+      if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      const data=c.toDataURL('image/jpeg',.82);
+      pd[n]={data,name:file.name,type:'image/jpeg'};
+      applySlot(n,data);updatePP();saveDraft();
+      toast(`📷 Foto ${n} adicionada!`,'ok');
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(file);
+  e.target.value='';
+}
+function applySlot(n,src){
+  const pv=document.getElementById('pv'+n);
+  let img=pv.querySelector('img');
+  if(!img){img=document.createElement('img');pv.appendChild(img);}
+  img.src=src;
+  pv.classList.add('has');
+  document.getElementById('pe'+n).style.display='none';
+  document.getElementById('pb'+n).classList.add('has');
+}
+function rmPhoto(n){
+  pd[n]=null;
+  const pv=document.getElementById('pv'+n),img=pv.querySelector('img');
+  if(img)img.remove();
+  pv.classList.remove('has');
+  document.getElementById('pe'+n).style.display='';
+  document.getElementById('pb'+n).classList.remove('has');
+  updatePP();saveDraft();
+}
+function updatePP(){
+  const cnt=[pd[1],pd[2]].filter(Boolean).length;
+  document.getElementById('ppF').style.width=(cnt/2*100)+'%';
+  document.getElementById('ppC').textContent=`${cnt} / 2 fotos`;
+  const s=document.getElementById('ppS'),f=document.getElementById('ppF');
+  if(cnt===0){s.textContent='Adicione as fotos';s.style.color='var(--mu)';f.style.background='var(--mu)';}
+  else if(cnt===1){s.textContent='1 faltando';s.style.color='var(--ac)';f.style.background='var(--ac)';}
+  else{s.textContent='✓ Completo';s.style.color='var(--gn)';f.style.background='var(--gn)';}
+}
+
+// ADD POLE
+function addPole(){
+  const poleId=V('poleId').trim(),type=V('poleType'),model=V('poleModel'),lat=parseFloat(V('lat')),lng=parseFloat(V('lng')),obs=V('poleObs').trim();
+  if(!poleId){toast('⚠️ Informe o ID do poste','er');return;}
+  if(isNaN(lat)||isNaN(lng)){toast('⚠️ Capture a localização GPS primeiro','er');return;}
+  const ex=poles.find(p=>p.poleId===poleId);
+  if(ex){
+    if(!ex.history)ex.history=[];
+    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],lat,lng});
+    ex.lat=lat;ex.lng=lng;
+    save();renderList();clearDraftS();resetForm();
+    toast(`🔄 Nova visita: ${poleId}!`,'ok');goTab('lista');return;
+  }
+  poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],date:new Date().toLocaleString('pt-BR'),history:[]});
+  save();renderList();clearDraftS();resetForm();
+  scheduleSync();
+  toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
+}
+
+function resetForm(){
+  ['poleId','poleObs','lat','lng'].forEach(id=>SV(id,''));  onTypeChange();
+  document.getElementById('gdot').className='gdot';
+  document.getElementById('gtxt').textContent='Toque para capturar a localização';
+  document.getElementById('btnGPS').innerHTML='<span style="font-size:20px">📍</span> Capturar GPS Agora';
+  document.getElementById('btnGPS').classList.remove('ld');
+  document.getElementById('mmap').style.display='none';
+  document.getElementById('mok').classList.remove('on');
+  [1,2].forEach(n=>rmPhoto(n));
+}
+
+// LIST
+function renderList(){
+  const list=document.getElementById('pList');
+  document.getElementById('cntBadge').textContent=poles.length;
+  if(!poles.length){list.innerHTML='<div class="empty"><div class="ei">🔆</div><p>Nenhum poste.<br>Toque em "Novo" para começar.</p></div>';return;}
+  list.innerHTML=poles.map((p,i)=>{
+    const th=p.photos.filter(Boolean).map(ph=>`<img class="pthumb" src="${ph.data}">`).join('');
+    const v=(p.history||[]).length;
+    return `<div class="pi" onclick="viewPole(${p.id})">
+      <div class="pn">${i+1}</div>
+      <div class="pbody">
+        <h3>${p.poleId} <span style="color:var(--mu);font-weight:500;font-size:12px">— ${p.type}${p.model?' · '+p.model:''}</span></h3>
+        <div class="pmeta">📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>🕐 ${p.date}</div>
+        <div class="ptags">
+          ${p.tech?`<span class="ptag2 ptag-t">👷 ${p.tech}</span>`:''}
+          ${v>0?`<span class="ptag2 ptag-v">🔄 ${v} visita${v>1?'s':''}</span>`:''}
+        </div>
+        ${th?`<div class="pstrip">${th}</div>`:''}
+      </div>
+      <button class="pdel" onclick="event.stopPropagation();if(confirm('Remover?'))delById(${p.id})">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function updStats(){
+  document.getElementById('stP').textContent=poles.length;
+  document.getElementById('stF').textContent=poles.reduce((s,p)=>s+p.photos.filter(Boolean).length,0);
+  document.getElementById('stT').textContent=new Set(poles.map(p=>p.tech).filter(Boolean)).size;
+}
+
+// MODAL
+function viewPole(id){
+  const p=poles.find(p=>p.id===id);if(!p)return;
+  curId=id;
+  document.getElementById('mTit').textContent=`Poste ${p.poleId}`;
+  const mp=document.getElementById('mPh');
+  mp.innerHTML=p.photos.filter(Boolean).map(ph=>`<img src="${ph.data}" onclick="window.open('${ph.data}')">`).join('')||'<p style="color:var(--mu);font-size:12px;grid-column:span 2">Sem fotos</p>';
+  const mm=document.getElementById('mmap2');
+  if(p.lat&&p.lng){
+    mm.style.display='block';
+    const offMsg2=document.getElementById('mapOfflineMsg2');
+    const coords2=document.getElementById('mapOfflineCoords2');
+    if(navigator.onLine){
+      offMsg2.style.display='none';
+      document.getElementById('mmf2').src=`https://www.openstreetmap.org/export/embed.html?bbox=${(p.lng-.003)},${(p.lat-.003)},${(+p.lng+.003)},${(+p.lat+.003)}&layer=mapnik&marker=${p.lat},${p.lng}`;
+    } else {
+      document.getElementById('mmf2').src='';
+      coords2.textContent=`${parseFloat(p.lat).toFixed(5)}, ${parseFloat(p.lng).toFixed(5)}`;
+      offMsg2.style.display='flex';
+    }
+  } else mm.style.display='none';
+  document.getElementById('mInfo').innerHTML=`<strong>ID:</strong> ${p.poleId}<br><strong>Tipo:</strong> ${p.type}<br><strong>Modelo:</strong> ${p.model||"Não informado"}<br><strong>Técnico:</strong> ${p.tech||'N/A'}<br><strong>Lat:</strong> ${p.lat}<br><strong>Lng:</strong> ${p.lng}<br><strong>Data:</strong> ${p.date}<br>${p.obs?`<strong>Obs:</strong> ${p.obs}`:''}`;
+  const hw=document.getElementById('mHW'),hist=p.history||[];
+  if(hist.length){
+    hw.style.display='block';
+    document.getElementById('mH').innerHTML=hist.slice().reverse().map(v=>{
+      const vt=(v.photos||[]).filter(Boolean).map(ph=>`<img src="${ph.data}">`).join('');
+      return `<div class="hi"><div class="hd">${v.date}</div><div class="ht">👷 ${v.tech}</div>${v.obs?`<div class="ho">${v.obs}</div>`:''}${vt?`<div class="hphotos">${vt}</div>`:''}</div>`;
+    }).join('');
+  } else hw.style.display='none';
+  document.getElementById('mov').classList.add('on');
+}
+function closeMod(){document.getElementById('mov').classList.remove('on');curId=null;}
+function openMaps(){const p=poles.find(p=>p.id===curId);if(p)window.open(`https://www.google.com/maps?q=${p.lat},${p.lng}`,'_blank');}
+function addVisit(){const p=poles.find(p=>p.id===curId);if(!p)return;closeMod();SV('poleId',p.poleId);goTab('cadastro');toast('📝 ID preenchido — capture GPS e fotos','info');}
+function confirmDel(){if(confirm('Remover este poste?')){delById(curId);closeMod();}}
+function delById(id){const i=poles.findIndex(p=>p.id===id);if(i<0)return;const nm=poles[i].poleId;poles.splice(i,1);save();renderList();toast(`🗑 ${nm} removido`,'info');}
+
+// KML/KMZ/PDF
+function buildKML(fk){
+  const ps=poles.map(p=>{const ph=p.photos.map((x,i)=>{if(!x)return'';const fn=`files/foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`;return fk?`<img src="${fn}" width="300"/><br/>`:''}).join('');return`<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Modelo:</b>${p.model||'N/A'}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}<br/>${p.obs?`<b>Obs:</b>${p.obs}<br/>`:''}${ph}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;}).join('');
+  return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>Postes</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
+}
+function exportKML(){if(!poles.length){toast('⚠️ Nenhum poste','er');return;}dl(new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'}),'postes.kml');toast('📄 KML exportado!','ok');}
+async function exportKMZ(){
+  if(!poles.length){toast('⚠️ Nenhum poste','er');return;}
+  if(typeof JSZip==='undefined'){toast('Carregando...','info');setTimeout(exportKMZ,1000);return;}
+  toast('📦 Gerando KMZ...','info');
+  try{
+    const zip=new JSZip();zip.file('doc.kml',buildKML(true));
+    const f=zip.folder('files');
+    poles.forEach(p=>p.photos.forEach((ph,i)=>{if(!ph)return;f.file(`foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`,ph.data.split(',')[1],{base64:true});}));
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+    dl(blob,'postes.kmz');
+    toast(`✅ KMZ: ${poles.length} postes`,'ok');
+  }catch(e){toast('❌ Erro KMZ','er');}
+}
+async function exportPDF(){
+  if(!poles.length){toast('⚠️ Nenhum poste','er');return;}
+  if(typeof window.jspdf==='undefined'){toast('Carregando...','info');setTimeout(exportPDF,1000);return;}
+  toast('📋 Gerando PDF...','info');
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,M=14,CW=W-M*2;let y=20;
+    doc.setFillColor(10,14,23);doc.rect(0,0,210,32,'F');
+    doc.setTextColor(245,166,35);doc.setFontSize(18);doc.setFont('helvetica','bold');
+    doc.text('PosteGPS — Relatório',M,18);
+    doc.setFontSize(9);doc.setTextColor(150,150,150);
+    doc.text(`${new Date().toLocaleString('pt-BR')}  •  ${poles.length} poste(s)`,M,26);
+    y=42;
+    for(let i=0;i<poles.length;i++){
+      const p=poles[i];
+      if(y>255){doc.addPage();y=18;}
+      doc.setFillColor(245,166,35);doc.rect(M,y,CW,8,'F');
+      doc.setTextColor(0,0,0);doc.setFontSize(11);doc.setFont('helvetica','bold');
+      doc.text(`${i+1}.  ${p.poleId}  —  ${p.type}`,M+3,y+5.5);y+=12;
+      doc.setTextColor(40,40,40);doc.setFontSize(9);doc.setFont('helvetica','normal');
+      [`Técnico: ${p.tech||'N/A'}`,`Tipo: ${p.type}${p.model?' — '+p.model:''}`,`GPS: ${p.lat}, ${p.lng}`,`Data: ${p.date}`,p.obs?`Obs: ${p.obs}`:null].filter(Boolean).forEach(l=>{doc.text(l,M,y);y+=5;});y+=3;
+      const vp=p.photos.filter(Boolean);
+      if(vp.length){
+        const pw=(CW-6)/2,ph2=pw*.78;
+        if(y+ph2>272){doc.addPage();y=18;}
+        for(let j=0;j<vp.length;j++){
+          try{const x=M+j*(pw+6);doc.addImage(vp[j].data,'JPEG',x,y,pw,ph2,undefined,'MEDIUM');doc.setDrawColor(200,200,200);doc.rect(x,y,pw,ph2,'S');doc.setFontSize(7);doc.setTextColor(120,120,120);doc.text(`Foto ${j+1}`,x+1,y+ph2-2);}catch(e){}
+        }
+        y+=ph2+8;
+      }
+      if((p.history||[]).length){doc.setFontSize(8);doc.setTextColor(100,100,100);doc.text(`Visitas: ${p.history.length}`,M,y);y+=5;}
+      doc.setDrawColor(230,230,230);doc.line(M,y,M+CW,y);y+=8;
+    }
+    doc.save(`postes-${new Date().toISOString().slice(0,10)}.pdf`);
+    toast('✅ PDF gerado!','ok');
+  }catch(e){toast('❌ Erro PDF','er');}
+}
+
+function exportCSV(){
+  if(!poles.length){toast('⚠️ Nenhum poste','er');return;}
+  const sep=';';
+  const headers=['ID','Tipo','Modelo','Latitude','Longitude','Técnico','Data','Observação','Fotos','Visitas'];
+  const rows=poles.map(p=>[
+    p.poleId,
+    p.type,
+    p.model||'',
+    p.lat,
+    p.lng,
+    p.tech||'',
+    p.date,
+    (p.obs||'').replace(/;/g,',').replace(/\n/g,' '),
+    p.photos.filter(Boolean).length,
+    (p.history||[]).length
+  ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(sep));
+  const csv='\uFEFF'+[headers.join(sep),...rows].join('\n');
+  dl(new Blob([csv],{type:'text/csv;charset=utf-8'}),'postes.csv');
+  toast('📊 CSV exportado!','ok');
+}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);}
+let tt;
+function toast(msg,type='info'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type} show`;clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200);}
+
+init();
+}
+
+</script>
+</body>
+</html>

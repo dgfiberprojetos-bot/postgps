@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>PosteGPS — Painel Supervisor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e17;--sf:#111827;--sf2:#1a2235;--bd:#1f2d45;--ac:#f5a623;--ac2:#e85d04;--gn:#22c55e;--rd:#ef4444;--bl:#3b82f6;--tx:#e2e8f0;--mu:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Syne',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+/* HEADER */
+.hdr{background:var(--sf);border-bottom:1px solid var(--bd);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;flex-shrink:0}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.hdr h1{font-size:18px;font-weight:800}
+.hdr h1 span{color:var(--ac)}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sync-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--mu)}
+.btn-sync{background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:8px;color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.btn-sync:active{transform:scale(.97)}
+/* STATS */
+.stats{display:flex;gap:10px;padding:14px 20px;background:var(--sf);border-bottom:1px solid var(--bd);flex-wrap:wrap;flex-shrink:0}
+.stat{background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.stat .sn{font-size:22px;font-weight:800;color:var(--ac)}
+.stat .sl{font-size:10px;color:var(--mu);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+/* FILTERS */
+.filters{display:flex;gap:8px;padding:12px 20px;background:var(--sf2);border-bottom:1px solid var(--bd);flex-wrap:wrap;flex-shrink:0;align-items:center}
+.filters label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu);font-family:'DM Mono',monospace;white-space:nowrap}
+.filters select,.filters input{background:var(--sf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;outline:none}
+.filters select:focus,.filters input:focus{border-color:var(--ac)}
+.btn-clear{background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mu);font-size:12px;font-family:'DM Mono',monospace;padding:7px 12px;cursor:pointer}
+.btn-clear:hover{border-color:var(--ac);color:var(--ac)}
+/* MAIN LAYOUT */
+.main{display:flex;flex:1;overflow:hidden;min-height:0}
+/* MAP */
+#map{flex:1;min-height:400px}
+/* SIDEBAR */
+.sidebar{width:320px;flex-shrink:0;background:var(--sf);border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-header{padding:14px 16px;border-bottom:1px solid var(--bd);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ac);font-family:'DM Mono',monospace;display:flex;align-items:center;justify-content:space-between}
+.pole-list{flex:1;overflow-y:auto;padding:8px}
+.pole-card{background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .2s}
+.pole-card:hover{border-color:var(--ac)}
+.pole-card.active{border-color:var(--ac);background:rgba(245,166,35,.05)}
+.pc-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.pc-num{width:30px;height:30px;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#000;flex-shrink:0}
+.pc-id{font-size:14px;font-weight:700}
+.pc-type{font-size:11px;color:var(--mu)}
+.pc-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--mu);line-height:1.7}
+.pc-tech{display:inline-flex;align-items:center;gap:3px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:4px;font-size:10px;font-family:'DM Mono',monospace;padding:1px 6px;margin-top:4px}
+/* POPUP */
+.lpopup{font-family:'DM Mono',monospace;font-size:12px;line-height:1.8;min-width:180px}
+.lpopup strong{color:#f5a623}
+.lpopup .pt{font-size:14px;font-weight:700;font-family:'Syne',sans-serif;margin-bottom:6px}
+/* EMPTY */
+.empty-list{text-align:center;padding:40px 16px;color:var(--mu);font-size:13px}
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--sf);border:1px solid var(--bd);border-radius:30px;padding:10px 20px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:999;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:var(--gn);color:var(--gn)}
+.toast.er{border-color:var(--rd);color:var(--rd)}
+.toast.info{border-color:var(--ac);color:var(--ac)}
+/* BIN INPUT */
+.bin-setup{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
+.bin-box{background:var(--sf);border:1px solid var(--bd);border-radius:16px;padding:32px;max-width:440px;width:100%;text-align:center}
+.bin-box h2{font-size:22px;font-weight:800;margin-bottom:8px}
+.bin-box h2 span{color:var(--ac)}
+.bin-box p{font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.6;font-family:'DM Mono',monospace}
+.bin-inp{width:100%;background:var(--sf2);border:1.5px solid var(--bd);border-radius:10px;color:var(--tx);font-family:'DM Mono',monospace;font-size:13px;padding:12px 14px;outline:none;margin-bottom:12px}
+.bin-inp:focus{border-color:var(--ac)}
+.bin-save{width:100%;background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:10px;color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;padding:14px;cursor:pointer}
+@media(max-width:768px){
+  .main{flex-direction:column}
+  #map{min-height:300px;flex:none}
+  .sidebar{width:100%;border-left:none;border-top:1px solid var(--bd);max-height:300px}
+  .stats{padding:10px 14px}
+}
+</style>
+</head>
+<body>
+
+<!-- BIN SETUP MODAL -->
+<div class="bin-setup" id="binSetup">
+  <div class="bin-box">
+    <div style="font-size:48px;margin-bottom:12px">🔆</div>
+    <h2>PosteGPS <span>Supervisor</span></h2>
+    <p>Cole o ID do Bin para conectar aos dados dos técnicos.<br>Obtenha o ID no app dos técnicos → Exportar → Sincronizar.</p>
+    <input class="bin-inp" id="binInput" placeholder="Cole o BIN ID aqui..." autocomplete="off">
+    <button class="bin-save" onclick="saveBin()">Conectar →</button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="logo">🔆</div>
+    <div>
+      <h1>PosteGPS <span>Supervisor</span></h1>
+      <div style="font-size:11px;color:var(--mu);font-family:'DM Mono',monospace">Painel em tempo real</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="sync-info" id="syncInfo">Aguardando...</span>
+    <button class="btn-sync" onclick="loadData()">🔄 Atualizar</button>
+    <button class="btn-sync" style="background:var(--sf2);color:var(--tx);border:1px solid var(--bd)" onclick="changeBin()">⚙️ Config</button>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat"><div class="sn" id="stTotal">0</div><div class="sl">Total Postes</div></div>
+  <div class="stat"><div class="sn" id="stHoje">0</div><div class="sl">Hoje</div></div>
+  <div class="stat"><div class="sn" id="stTechs">0</div><div class="sl">Técnicos</div></div>
+  <div class="stat"><div class="sn" id="stPhotos">0</div><div class="sl">Com Fotos</div></div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+  <label>Técnico:</label>
+  <select id="filtTech" onchange="applyFilters()">
+    <option value="">Todos</option>
+  </select>
+  <label>Tipo:</label>
+  <select id="filtType" onchange="applyFilters()">
+    <option value="">Todos</option>
+    <option value="Concreto">Concreto</option>
+    <option value="Metálico">Metálico</option>
+    <option value="Madeira">Madeira</option>
+    <option value="Fibra de Vidro">Fibra de Vidro</option>
+    <option value="Poste com Transformador">Com Transformador</option>
+  </select>
+  <label>Buscar:</label>
+  <input type="text" id="filtSearch" placeholder="ID do poste..." oninput="applyFilters()">
+  <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div id="map"></div>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span id="listCount">0 postes</span>
+      <span style="color:var(--mu);font-weight:400">Lista</span>
+    </div>
+    <div class="pole-list" id="poleList">
+      <div class="empty-list">Carregando dados...</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const JKEY = '$2a$10$AsRx5rC8JX7R/Hvab5G9VOh4H47/tSun0quWwboI9eDZ7VMOG8CDW';
+const JBASE = 'https://api.jsonbin.io/v3';
+let poles = [];
+let filtered = [];
+let map, markers = [];
+let currentBin = localStorage.getItem('pgps_supervisor_bin') || null;
+
+// ── INIT ──────────────────────────────────────────────────────────────
+function init(){
+  // Init map
+  map = L.map('map').setView([-2.45, -54.71], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:19
+  }).addTo(map);
+
+  if(currentBin){
+    document.getElementById('binSetup').style.display='none';
+    loadData();
+    setInterval(loadData, 30000); // refresh every 30s
+  }
+}
+
+// ── BIN SETUP ─────────────────────────────────────────────────────────
+function saveBin(){
+  const v = document.getElementById('binInput').value.trim();
+  if(!v){ toast('⚠️ Cole o BIN ID','er'); return; }
+  currentBin = v;
+  localStorage.setItem('pgps_supervisor_bin', v);
+  document.getElementById('binSetup').style.display='none';
+  loadData();
+  setInterval(loadData, 30000);
+}
+function changeBin(){
+  document.getElementById('binInput').value = currentBin||'';
+  document.getElementById('binSetup').style.display='flex';
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────────────
+async function loadData(){
+  if(!currentBin) return;
+  try{
+    document.getElementById('syncInfo').textContent = '🔄 Atualizando...';
+    const r = await fetch(`${JBASE}/b/${currentBin}/latest`,{
+      headers:{'X-Master-Key':JKEY}
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    poles = (d.record && d.record.poles) || [];
+    const now = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('syncInfo').textContent = `✅ Atualizado às ${now}`;
+    applyFilters();
+    updateStats();
+    toast(`📡 ${poles.length} postes carregados`,'ok');
+  }catch(e){
+    console.error(e);
+    document.getElementById('syncInfo').textContent = '❌ Erro ao conectar';
+    toast('❌ Erro ao carregar dados','er');
+  }
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────
+function updateStats(){
+  document.getElementById('stTotal').textContent = poles.length;
+  const today = new Date().toLocaleDateString('pt-BR');
+  document.getElementById('stHoje').textContent = poles.filter(p=>p.date&&p.date.startsWith(today.split('/').reverse().join('/'))||p.date&&p.date.includes(today)).length;
+  document.getElementById('stTechs').textContent = new Set(poles.map(p=>p.tech).filter(Boolean)).size;
+  document.getElementById('stPhotos').textContent = poles.filter(p=>p.hasPhotos>0).length;
+
+  // Populate tech filter
+  const techs = [...new Set(poles.map(p=>p.tech).filter(Boolean))];
+  const sel = document.getElementById('filtTech');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + techs.map(t=>`<option value="${t}">${t}</option>`).join('');
+  sel.value = cur;
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────
+function applyFilters(){
+  const tech = document.getElementById('filtTech').value;
+  const type = document.getElementById('filtType').value;
+  const search = document.getElementById('filtSearch').value.toLowerCase();
+  filtered = poles.filter(p=>{
+    if(tech && p.tech !== tech) return false;
+    if(type && p.type !== type) return false;
+    if(search && !p.poleId.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  renderMap();
+  renderList();
+}
+
+function clearFilters(){
+  document.getElementById('filtTech').value='';
+  document.getElementById('filtType').value='';
+  document.getElementById('filtSearch').value='';
+  applyFilters();
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────
+function renderMap(){
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+  if(!filtered.length) return;
+
+  const bounds=[];
+  filtered.forEach((p,i)=>{
+    if(!p.lat||!p.lng) return;
+    const icon = L.divIcon({
+      html:`<div style="background:linear-gradient(135deg,#f5a623,#e85d04);width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4)"><span style="transform:rotate(45deg);font-size:11px;font-weight:800;color:#000">${i+1}</span></div>`,
+      className:'',iconSize:[28,28],iconAnchor:[14,28]
+    });
+    const m = L.marker([p.lat,p.lng],{icon})
+      .addTo(map)
+      .bindPopup(`<div class="lpopup"><div class="pt">Poste ${p.poleId}</div><strong>Tipo:</strong> ${p.type}<br>${p.model?`<strong>Modelo:</strong> ${p.model}<br>`:''}<strong>Técnico:</strong> ${p.tech||'N/A'}<br><strong>Data:</strong> ${p.date}<br>${p.obs?`<strong>Obs:</strong> ${p.obs}<br>`:''}<strong>Fotos:</strong> ${p.hasPhotos||0}</div>`);
+    m.on('click',()=>highlightCard(p.id));
+    markers.push(m);
+    bounds.push([p.lat,p.lng]);
+  });
+
+  if(bounds.length) map.fitBounds(bounds,{padding:[30,30],maxZoom:16});
+}
+
+// ── LIST ──────────────────────────────────────────────────────────────
+function renderList(){
+  const list = document.getElementById('poleList');
+  document.getElementById('listCount').textContent = `${filtered.length} poste${filtered.length!==1?'s':''}`;
+  if(!filtered.length){
+    list.innerHTML='<div class="empty-list">Nenhum poste encontrado</div>';
+    return;
+  }
+  list.innerHTML = filtered.map((p,i)=>`
+    <div class="pole-card" id="card-${p.id}" onclick="focusPole(${i},'${p.id}')">
+      <div class="pc-header">
+        <div class="pc-num">${i+1}</div>
+        <div>
+          <div class="pc-id">${p.poleId}</div>
+          <div class="pc-type">${p.type}${p.model?' · '+p.model:''}</div>
+        </div>
+      </div>
+      <div class="pc-meta">
+        📍 ${parseFloat(p.lat).toFixed(5)}, ${parseFloat(p.lng).toFixed(5)}<br>
+        🕐 ${p.date}<br>
+        📷 ${p.hasPhotos||0} foto(s) · 🔄 ${(p.history||[]).length} visita(s)
+      </div>
+      ${p.tech?`<div class="pc-tech">👷 ${p.tech}</div>`:''}
+    </div>`).join('');
+}
+
+function focusPole(idx, id){
+  if(markers[idx]){
+    map.setView(markers[idx].getLatLng(),17);
+    markers[idx].openPopup();
+  }
+  highlightCard(id);
+}
+
+function highlightCard(id){
+  document.querySelectorAll('.pole-card').forEach(c=>c.classList.remove('active'));
+  const card = document.getElementById('card-'+id);
+  if(card){ card.classList.add('active'); card.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+}
+
+let tt;
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className=`toast ${type} show`;
+  clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+init();
+</script>
+</body>
+</html>
