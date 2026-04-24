@@ -396,42 +396,31 @@ input[type=file]{display:none}
 
 
 // ══════════════════════════════════════════════
-// JSONBIN SYNC CONFIG — BIN compartilhado entre todos os técnicos
+// JSONBIN SYNC CONFIG — BIN FIXO compartilhado
 // ══════════════════════════════════════════════
 const JKEY = '$2a$10$AsRx5rC8JX7R/Hvab5G9VOh4H47/tSun0quWwboI9eDZ7VMOG8CDW';
 const JBASE = 'https://api.jsonbin.io/v3';
-let BIN_ID = localStorage.getItem('pgps_shared_bin') || null;
+const FIXED_BIN_ID = '69ebc9af36566621a8eabcb7'; // BIN fixo — todos os técnicos usam o mesmo
+let BIN_ID = FIXED_BIN_ID; // sempre o mesmo, não muda
 let syncTimer = null;
 
 async function ensureBin() {
-  if(BIN_ID) return BIN_ID;
-  try {
-    const r = await fetch(JBASE+'/b', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-Master-Key':JKEY,'X-Bin-Name':'postgps-shared-2026','X-Bin-Private':'false'},
-      body: JSON.stringify({poles:[],version:1})
-    });
-    const d = await r.json();
-    BIN_ID = d.metadata.id;
-    localStorage.setItem('pgps_shared_bin', BIN_ID);
-    // Also store for supervisor
-    localStorage.setItem('pgps_bin', BIN_ID);
-    return BIN_ID;
-  } catch(e) { console.error('ensureBin',e); return null; }
+  // Sempre retorna o BIN fixo
+  localStorage.setItem('pgps_shared_bin', FIXED_BIN_ID);
+  localStorage.setItem('pgps_bin', FIXED_BIN_ID);
+  return FIXED_BIN_ID;
 }
 
 async function pushToCloud() {
   if(!navigator.onLine) return;
   try {
-    const id = await ensureBin();
-    if(!id) return;
-    // Get current cloud data first
+    // Get current cloud data first to merge
     let cloudPoles = [];
     try {
-      const gr = await fetch(JBASE+'/b/'+id+'/latest', {headers:{'X-Master-Key':JKEY}});
+      const gr = await fetch(JBASE+'/b/'+FIXED_BIN_ID+'/latest', {headers:{'X-Master-Key':JKEY}});
       if(gr.ok) { const gd = await gr.json(); cloudPoles = gd.record && gd.record.poles ? gd.record.poles : []; }
     } catch(e) {}
-    // Merge: add/update local poles into cloud
+    // Merge local into cloud
     const merged = [...cloudPoles];
     for(const p of poles) {
       const idx = merged.findIndex(cp=>cp.id===p.id);
@@ -439,7 +428,7 @@ async function pushToCloud() {
       const lite = {id:p.id,poleId:p.poleId,type:p.type,model:p.model||'',lat:p.lat,lng:p.lng,obs:p.obs||'',tech:p.tech||'',date:p.date,history:p.history||[],hasPhotos:ph.filter(Boolean).length};
       if(idx>=0) merged[idx]=lite; else merged.push(lite);
     }
-    await fetch(JBASE+'/b/'+id, {
+    await fetch(JBASE+'/b/'+FIXED_BIN_ID, {
       method:'PUT',
       headers:{'Content-Type':'application/json','X-Master-Key':JKEY},
       body: JSON.stringify({poles:merged, lastUpdate:new Date().toISOString()})
@@ -447,16 +436,14 @@ async function pushToCloud() {
     const el=document.getElementById('syncStatus');
     if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const binEl=document.getElementById('binIdDisp');
-    if(binEl&&BIN_ID) binEl.textContent=BIN_ID;
+    if(binEl) binEl.textContent=FIXED_BIN_ID;
   } catch(e) { console.error('push',e); }
 }
 
 async function pullFromCloud() {
   if(!navigator.onLine) return;
   try {
-    const id = await ensureBin();
-    if(!id) return;
-    const r = await fetch(JBASE+'/b/'+id+'/latest', {headers:{'X-Master-Key':JKEY}});
+    const r = await fetch(JBASE+'/b/'+FIXED_BIN_ID+'/latest', {headers:{'X-Master-Key':JKEY}});
     const d = await r.json();
     if(!d.record||!d.record.poles) return;
     const cloudPoles = d.record.poles||[];
@@ -468,7 +455,7 @@ async function pullFromCloud() {
     const el=document.getElementById('syncStatus');
     if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const binEl=document.getElementById('binIdDisp');
-    if(binEl&&BIN_ID) binEl.textContent=BIN_ID;
+    if(binEl) binEl.textContent=FIXED_BIN_ID;
   } catch(e) { console.error('pull',e); }
 }
 
