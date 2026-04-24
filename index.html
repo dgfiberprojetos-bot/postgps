@@ -396,11 +396,11 @@ input[type=file]{display:none}
 
 
 // ══════════════════════════════════════════════
-// JSONBIN SYNC CONFIG
+// JSONBIN SYNC CONFIG — BIN compartilhado entre todos os técnicos
 // ══════════════════════════════════════════════
 const JKEY = '$2a$10$AsRx5rC8JX7R/Hvab5G9VOh4H47/tSun0quWwboI9eDZ7VMOG8CDW';
 const JBASE = 'https://api.jsonbin.io/v3';
-let BIN_ID = localStorage.getItem('pgps_bin') || null;
+let BIN_ID = localStorage.getItem('pgps_shared_bin') || null;
 let syncTimer = null;
 
 async function ensureBin() {
@@ -408,11 +408,13 @@ async function ensureBin() {
   try {
     const r = await fetch(JBASE+'/b', {
       method:'POST',
-      headers:{'Content-Type':'application/json','X-Master-Key':JKEY,'X-Bin-Name':'postgps-data','X-Bin-Private':'false'},
+      headers:{'Content-Type':'application/json','X-Master-Key':JKEY,'X-Bin-Name':'postgps-shared-2026','X-Bin-Private':'false'},
       body: JSON.stringify({poles:[],version:1})
     });
     const d = await r.json();
     BIN_ID = d.metadata.id;
+    localStorage.setItem('pgps_shared_bin', BIN_ID);
+    // Also store for supervisor
     localStorage.setItem('pgps_bin', BIN_ID);
     return BIN_ID;
   } catch(e) { console.error('ensureBin',e); return null; }
@@ -423,19 +425,29 @@ async function pushToCloud() {
   try {
     const id = await ensureBin();
     if(!id) return;
-    const lite = poles.map(p => {
-      const {photos,...rest} = p;
-      return {...rest, hasPhotos: photos.filter(Boolean).length};
-    });
+    // Get current cloud data first
+    let cloudPoles = [];
+    try {
+      const gr = await fetch(JBASE+'/b/'+id+'/latest', {headers:{'X-Master-Key':JKEY}});
+      if(gr.ok) { const gd = await gr.json(); cloudPoles = gd.record && gd.record.poles ? gd.record.poles : []; }
+    } catch(e) {}
+    // Merge: add/update local poles into cloud
+    const merged = [...cloudPoles];
+    for(const p of poles) {
+      const idx = merged.findIndex(cp=>cp.id===p.id);
+      const ph = p.photos || [];
+      const lite = {id:p.id,poleId:p.poleId,type:p.type,model:p.model||'',lat:p.lat,lng:p.lng,obs:p.obs||'',tech:p.tech||'',date:p.date,history:p.history||[],hasPhotos:ph.filter(Boolean).length};
+      if(idx>=0) merged[idx]=lite; else merged.push(lite);
+    }
     await fetch(JBASE+'/b/'+id, {
       method:'PUT',
       headers:{'Content-Type':'application/json','X-Master-Key':JKEY},
-      body: JSON.stringify({poles:lite, lastUpdate: new Date().toISOString(), tech: tech})
+      body: JSON.stringify({poles:merged, lastUpdate:new Date().toISOString()})
     });
     const el=document.getElementById('syncStatus');
     if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const binEl=document.getElementById('binIdDisp');
-    if(binEl && BIN_ID) binEl.textContent=BIN_ID;
+    if(binEl&&BIN_ID) binEl.textContent=BIN_ID;
   } catch(e) { console.error('push',e); }
 }
 
@@ -444,29 +456,19 @@ async function pullFromCloud() {
   try {
     const id = await ensureBin();
     if(!id) return;
-    const r = await fetch(JBASE+'/b/'+id+'/latest', {
-      headers:{'X-Master-Key':JKEY}
-    });
+    const r = await fetch(JBASE+'/b/'+id+'/latest', {headers:{'X-Master-Key':JKEY}});
     const d = await r.json();
-    if(!d.record || !d.record.poles) return;
-    const cloudPoles = d.record.poles || [];
-    let added = 0;
+    if(!d.record||!d.record.poles) return;
+    const cloudPoles = d.record.poles||[];
+    let added=0;
     for(const cp of cloudPoles) {
-      const exists = poles.find(p=>p.id===cp.id);
-      if(!exists) {
-        poles.push({...cp, photos:[null,null]});
-        added++;
-      }
+      if(!poles.find(p=>p.id===cp.id)) { poles.push({...cp,photos:[null,null]}); added++; }
     }
-    if(added>0) {
-      save();
-      renderList();
-      toast('☁️ '+added+' poste(s) sincronizado(s)!','ok');
-    }
+    if(added>0) { save(); renderList(); toast('☁️ '+added+' poste(s) sincronizado(s)!','ok'); }
     const el=document.getElementById('syncStatus');
     if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const binEl=document.getElementById('binIdDisp');
-    if(binEl && BIN_ID) binEl.textContent=BIN_ID;
+    if(binEl&&BIN_ID) binEl.textContent=BIN_ID;
   } catch(e) { console.error('pull',e); }
 }
 
