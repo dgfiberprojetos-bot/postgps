@@ -23,7 +23,7 @@
 html,body{background:var(--bg);color:var(--tx);font-family:'Syne',system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 /* fonts loaded async below */
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(245,166,35,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(245,166,35,.03) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;z-index:0}
-.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 86px}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 86px;background:var(--bg)} @media(min-width:520px){body{display:flex;justify-content:center;background:#000} .app{box-shadow:0 0 60px rgba(0,0,0,.5);min-height:100vh} .tab-bar{max-width:480px;left:50%;transform:translateX(-50%)}}
 /* TABS */
 .tab-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(10,14,23,.98);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--bd);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
 .tb{flex:1;background:none;border:none;color:var(--mu);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 4px;cursor:pointer;transition:color .2s;min-height:var(--tap)}
@@ -500,7 +500,7 @@ async function getAddress(lat,lng){
 // ══════════════════════════════════════════════
 let poles=[], pd={1:null,2:null}, tech='', curId=null;
 
-function init(){  onTypeChange();
+function init(){
   try{
     const s=localStorage.getItem('pgps4');
     if(s) poles=JSON.parse(s);
