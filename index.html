@@ -397,66 +397,69 @@ input[type=file]{display:none}
 
 
 // ══════════════════════════════════════════════
-// JSONBIN SYNC CONFIG — BIN FIXO compartilhado
+// GOOGLE SHEETS SYNC — sem bloqueio de CORS
 // ══════════════════════════════════════════════
-const JKEY = '$2a$10$AsRx5rC8JX7R/Hvab5G9VOh4H47/tSun0quWwboI9eDZ7VMOG8CDW';
-const JBASE = 'https://api.jsonbin.io/v3';
-const FIXED_BIN_ID = '69ebc9af36566621a8eabcb7'; // BIN fixo — todos os técnicos usam o mesmo
-let BIN_ID = FIXED_BIN_ID; // sempre o mesmo, não muda
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw_9GsbMJPwhLWTrRM5j14zQrW7qdZN_AMtnDhI7nPXler0WnbYOT06_RCYr05poBN8/exec';
+const SHEETS_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjNepfhKHZ_g7uBzSHVqFuMVHQ9939NQfOJ7dxfYY3WqRpEFLHQ94KV2XDbeHsLOgn_hnvoSshBT4C/pub?output=csv';
 let syncTimer = null;
+let BIN_ID = 'google-sheets'; // fixo
 
-async function ensureBin() {
-  // Sempre retorna o BIN fixo
-  localStorage.setItem('pgps_shared_bin', FIXED_BIN_ID);
-  localStorage.setItem('pgps_bin', FIXED_BIN_ID);
-  return FIXED_BIN_ID;
-}
+async function ensureBin() { return 'google-sheets'; }
 
 async function pushToCloud() {
   if(!navigator.onLine) return;
   try {
-    // Get current cloud data first to merge
-    let cloudPoles = [];
-    try {
-      const gr = await fetch(JBASE+'/b/'+FIXED_BIN_ID+'/latest', {headers:{'X-Master-Key':JKEY}});
-      if(gr.ok) { const gd = await gr.json(); cloudPoles = gd.record && gd.record.poles ? gd.record.poles : []; }
-    } catch(e) {}
-    // Merge local into cloud
-    const merged = [...cloudPoles];
-    for(const p of poles) {
-      const idx = merged.findIndex(cp=>cp.id===p.id);
-      const ph = p.photos || [];
-      const lite = {id:p.id,poleId:p.poleId,type:p.type,model:p.model||'',lat:p.lat,lng:p.lng,obs:p.obs||'',tech:p.tech||'',date:p.date,history:p.history||[],hasPhotos:ph.filter(Boolean).length};
-      if(idx>=0) merged[idx]=lite; else merged.push(lite);
-    }
-    await fetch(JBASE+'/b/'+FIXED_BIN_ID, {
-      method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':JKEY},
-      body: JSON.stringify({poles:merged, lastUpdate:new Date().toISOString()})
+    const ph = poles.map(p => {
+      const photos = p.photos || [];
+      return {...p, photos:undefined, hasPhotos: photos.filter(Boolean).length};
+    });
+    await fetch(SCRIPT_URL, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({poles: ph})
     });
     const el=document.getElementById('syncStatus');
     if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const binEl=document.getElementById('binIdDisp');
-    if(binEl) binEl.textContent=FIXED_BIN_ID;
+    if(binEl) binEl.textContent='Google Sheets ✅';
   } catch(e) { console.error('push',e); }
 }
 
 async function pullFromCloud() {
   if(!navigator.onLine) return;
   try {
-    const r = await fetch(JBASE+'/b/'+FIXED_BIN_ID+'/latest', {headers:{'X-Master-Key':JKEY}});
-    const d = await r.json();
-    if(!d.record||!d.record.poles) return;
-    const cloudPoles = d.record.poles||[];
+    const r = await fetch(SHEETS_CSV+'&t='+Date.now());
+    if(!r.ok) return;
+    const csv = await r.text();
+    const lines = csv.trim().split('\n');
+    if(lines.length < 2) return;
+    const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+    const cloudPoles = lines.slice(1).filter(l=>l.trim()).map(line=>{
+      const cols=[];let cur='',inQ=false;
+      for(let i=0;i<line.length;i++){
+        if(line[i]==='"'){inQ=!inQ;}
+        else if(line[i]===','&&!inQ){cols.push(cur);cur='';}
+        else{cur+=line[i];}
+      }
+      cols.push(cur);
+      const obj={};
+      headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
+      obj.lat=parseFloat(obj.lat)||0;
+      obj.lng=parseFloat(obj.lng)||0;
+      obj.hasPhotos=parseInt(obj.hasPhotos)||0;
+      try{obj.history=obj.history?JSON.parse(obj.history):[];}catch(e){obj.history=[];}
+      obj.photos=[null,null];
+      return obj;
+    }).filter(p=>p.lat&&p.lng&&p.poleId);
+
     let added=0;
-    for(const cp of cloudPoles) {
-      if(!poles.find(p=>p.id===cp.id)) { poles.push({...cp,photos:[null,null]}); added++; }
+    for(const cp of cloudPoles){
+      if(!poles.find(p=>p.id==cp.id)){poles.push(cp);added++;}
     }
-    if(added>0) { save(); renderList(); toast('☁️ '+added+' poste(s) sincronizado(s)!','ok'); }
+    if(added>0){save();renderList();toast('☁️ '+added+' poste(s) sincronizado(s)!','ok');}
     const el=document.getElementById('syncStatus');
     if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    const binEl=document.getElementById('binIdDisp');
-    if(binEl) binEl.textContent=FIXED_BIN_ID;
   } catch(e) { console.error('pull',e); }
 }
 
