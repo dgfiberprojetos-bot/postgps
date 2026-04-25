@@ -445,13 +445,15 @@ async function pullFromCloud() {
       cols.push(cur);
       const obj={};
       headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
-      obj.lat=parseFloat(obj.lat)||0;
-      obj.lng=parseFloat(obj.lng)||0;
+      obj.lat=parseFloat((obj.lat||"0").replace(",","."))||0;
+      obj.lng=parseFloat((obj.lng||"0").replace(",","."))||0;
       obj.hasPhotos=parseInt(obj.hasPhotos)||0;
       try{obj.history=obj.history?JSON.parse(obj.history):[];}catch(e){obj.history=[];}
       obj.photos=[null,null];
       return obj;
-    }).filter(p=>p.lat&&p.lng&&p.poleId);
+    }).filter(p=>p.lat&&p.lng&&p.poleId&&Math.abs(p.lat)>0.001&&Math.abs(p.lng)>0.001
+      // Only accept poles with at least 4 decimal precision
+      &&(String(p.lat).replace("-","").includes(".")?String(p.lat).split(".")[1].length>=4:false));
 
     let added=0;
     for(const cp of cloudPoles){
