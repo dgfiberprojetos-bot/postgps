@@ -438,55 +438,50 @@ async function loadData(){
   const info=document.getElementById('syncInfo');
   dot.className='sync-dot';
   info.textContent='Carregando...';
-
-  // Try multiple methods to bypass CORS
-  const urls = [
-    // Direct
-    `${JBASE}/b/${currentBin}/latest`,
-    // Via allorigins proxy
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(JBASE+'/b/'+currentBin+'/latest')}`,
-    // Via corsproxy.io
-    `https://corsproxy.io/?${encodeURIComponent(JBASE+'/b/'+currentBin+'/latest')}`
-  ];
-
-  for(const url of urls){
-    try{
-      const headers = url.includes('allorigins') || url.includes('corsproxy')
-        ? {} 
-        : {'X-Master-Key':JKEY};
-      
-      // For proxy URLs, we need to add the key differently
-      let fetchUrl = url;
-      if(url.includes('allorigins') || url.includes('corsproxy')){
-        // Encode URL with key in header won't work via proxy
-        // Use URL with key as param instead
-        const baseUrl = `${JBASE}/b/${currentBin}/latest?X-Master-Key=${encodeURIComponent(JKEY)}`;
-        fetchUrl = url.includes('allorigins')
-          ? `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`
-          : `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`;
+  try{
+    // Read from Google Sheets - no CORS issues!
+    const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjNepfhKHZ_g7uBzSHVqFuMVHQ9939NQfOJ7dxfYY3WqRpEFLHQ94KV2XDbeHsLOgn_hnvoSshBT4C/pub?output=csv&t='+Date.now();
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const csv = await r.text();
+    
+    // Parse CSV
+    const lines = csv.trim().split('\n');
+    if(lines.length < 2){ poles=[]; applyFilters(); updateStats(); return; }
+    
+    const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+    poles = lines.slice(1).filter(l=>l.trim()).map(line=>{
+      // Handle CSV with commas inside quotes
+      const cols = [];
+      let cur='', inQ=false;
+      for(let i=0;i<line.length;i++){
+        if(line[i]==='"'){ inQ=!inQ; }
+        else if(line[i]===','&&!inQ){ cols.push(cur); cur=''; }
+        else { cur+=line[i]; }
       }
+      cols.push(cur);
+      const obj={};
+      headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
+      // Convert numeric fields
+      obj.lat = parseFloat(obj.lat)||0;
+      obj.lng = parseFloat(obj.lng)||0;
+      obj.hasPhotos = parseInt(obj.hasPhotos)||0;
+      try{ obj.history = obj.history ? JSON.parse(obj.history) : []; }catch(e){ obj.history=[]; }
+      return obj;
+    }).filter(p=>p.lat&&p.lng);
 
-      const r = await fetch(fetchUrl, {headers, mode:'cors'});
-      if(!r.ok) continue;
-      const text = await r.text();
-      const d = JSON.parse(text);
-      poles = (d.record && d.record.poles) || (d.poles) || [];
-      const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-      dot.className='sync-dot ok';
-      info.textContent=`Atualizado ${now}`;
-      applyFilters();updateStats();
-      toast(`📡 ${poles.length} poste(s) carregado(s)`,'ok');
-      return; // success
-    }catch(e){
-      console.warn('Tentativa falhou:', url, e.message);
-      continue;
-    }
+    const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    dot.className='sync-dot ok';
+    info.textContent=`Atualizado ${now}`;
+    applyFilters(); updateStats();
+    toast(`📡 ${poles.length} poste(s) carregado(s)`,'ok');
+  }catch(e){
+    console.error(e);
+    dot.style.background='var(--rd)';
+    info.textContent='Erro de conexão';
+    toast('❌ Erro ao carregar dados','er');
   }
-  // All failed
-  dot.style.background='var(--rd)';
-  info.textContent='Erro de conexão';
-  toast('❌ Erro ao carregar. Verifique a conexão.','er');
-}
+}}
 
 // ── STATS ─────────────────────────────────────────────────────────────
 function updateStats(){
