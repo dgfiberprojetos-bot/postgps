@@ -438,21 +438,54 @@ async function loadData(){
   const info=document.getElementById('syncInfo');
   dot.className='sync-dot';
   info.textContent='Carregando...';
-  try{
-    const r=await fetch(`${JBASE}/b/${currentBin}/latest`,{headers:{'X-Master-Key':JKEY}});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    poles=(d.record&&d.record.poles)||[];
-    const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    dot.className='sync-dot ok';
-    info.textContent=`Atualizado ${now}`;
-    applyFilters();updateStats();
-    toast(`📡 ${poles.length} poste(s) carregado(s)`,'ok');
-  }catch(e){
-    dot.className='sync-dot';dot.style.background='var(--rd)';
-    info.textContent='Erro de conexão';
-    toast('❌ Erro ao carregar dados','er');
+
+  // Try multiple methods to bypass CORS
+  const urls = [
+    // Direct
+    `${JBASE}/b/${currentBin}/latest`,
+    // Via allorigins proxy
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(JBASE+'/b/'+currentBin+'/latest')}`,
+    // Via corsproxy.io
+    `https://corsproxy.io/?${encodeURIComponent(JBASE+'/b/'+currentBin+'/latest')}`
+  ];
+
+  for(const url of urls){
+    try{
+      const headers = url.includes('allorigins') || url.includes('corsproxy')
+        ? {} 
+        : {'X-Master-Key':JKEY};
+      
+      // For proxy URLs, we need to add the key differently
+      let fetchUrl = url;
+      if(url.includes('allorigins') || url.includes('corsproxy')){
+        // Encode URL with key in header won't work via proxy
+        // Use URL with key as param instead
+        const baseUrl = `${JBASE}/b/${currentBin}/latest?X-Master-Key=${encodeURIComponent(JKEY)}`;
+        fetchUrl = url.includes('allorigins')
+          ? `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`
+          : `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`;
+      }
+
+      const r = await fetch(fetchUrl, {headers, mode:'cors'});
+      if(!r.ok) continue;
+      const text = await r.text();
+      const d = JSON.parse(text);
+      poles = (d.record && d.record.poles) || (d.poles) || [];
+      const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      dot.className='sync-dot ok';
+      info.textContent=`Atualizado ${now}`;
+      applyFilters();updateStats();
+      toast(`📡 ${poles.length} poste(s) carregado(s)`,'ok');
+      return; // success
+    }catch(e){
+      console.warn('Tentativa falhou:', url, e.message);
+      continue;
+    }
   }
+  // All failed
+  dot.style.background='var(--rd)';
+  info.textContent='Erro de conexão';
+  toast('❌ Erro ao carregar. Verifique a conexão.','er');
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────
