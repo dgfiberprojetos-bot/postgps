@@ -481,7 +481,7 @@ async function loadData(){
     info.textContent='Erro de conexão';
     toast('❌ Erro ao carregar dados','er');
   }
-}}
+}
 
 // ── STATS ─────────────────────────────────────────────────────────────
 function updateStats(){
@@ -584,7 +584,7 @@ function renderList(){
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
         ${p.tech?`<span class="pc-tech">👷 ${p.tech}</span>`:''}
         ${p.hasPhotos>0?`<span class="pc-photos">📷 ${p.hasPhotos} foto(s)</span>`:''}
-        ${(p.history||[]).length>0?`<span class="pc-photos" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25);color:var(--pu)">🔄 ${p.history.length} visita(s)</span>":''}
+        ${(p.history||[]).length>0?`<span class="pc-photos" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25);color:var(--pu)">🔄 ${p.history.length} visita(s)</span>`:''}
         ${(!p.hasPhotos||p.hasPhotos===0)?'<span class="no-photo-badge">⚠️ Sem foto</span>':''}
       </div>
     </div>`).join('');
@@ -692,8 +692,7 @@ function panelExportCSV(){
   const sep=';';
   const headers=['ID','Tipo','Modelo','Latitude','Longitude','Técnico','Data','Observação','Fotos','Visitas'];
   const rows=filtered.map(p=>[p.poleId,p.type,p.model||'',p.lat,p.lng,p.tech||'',p.date,(p.obs||'').replace(/;/g,','),p.hasPhotos||0,(p.history||[]).length].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(sep));
-  const csv='﻿'+[headers.join(sep),...rows].join('
-');
+  const csv='\uFEFF'+[headers.join(sep),...rows].join('\n');
   panelDL(new Blob([csv],{type:'text/csv;charset=utf-8'}),'postes-painel.csv');
   toast('📊 CSV exportado!','ok');
 }
