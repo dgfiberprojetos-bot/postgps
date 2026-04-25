@@ -368,7 +368,8 @@ input[type=file]{display:none}
       <div class="hlist" id="mH"></div>
     </div>
     <div class="macts">
-      <button class="ma" onclick="openMaps()">🗺 Ver no Maps</button>
+      <button class="ma" onclick="openGoogleMaps()">🗺 Google Maps</button>
+      <button class="ma" onclick="openWaze()">🚗 Waze</button>
       <button class="ma" onclick="addVisit()">➕ Nova Visita</button>
       <button class="ma full danger" onclick="confirmDel()">🗑 Remover Poste</button>
       <button class="ma full" onclick="closeMod()">Fechar</button>
@@ -803,7 +804,9 @@ function viewPole(id){
   document.getElementById('mov').classList.add('on');
 }
 function closeMod(){document.getElementById('mov').classList.remove('on');curId=null;}
-function openMaps(){const p=poles.find(p=>p.id===curId);if(p)window.open(`https://www.google.com/maps?q=${p.lat},${p.lng}`,'_blank');}
+function openMaps(){openGoogleMaps();}
+function openGoogleMaps(){const p=poles.find(p=>p.id===curId);if(p)window.open(`https://www.google.com/maps?q=${p.lat},${p.lng}`,'_blank');}
+function openWaze(){const p=poles.find(p=>p.id===curId);if(p)window.open(`https://waze.com/ul?ll=${p.lat},${p.lng}&navigate=yes`,'_blank');}
 function addVisit(){const p=poles.find(p=>p.id===curId);if(!p)return;closeMod();SV('poleId',p.poleId);goTab('cadastro');toast('📝 ID preenchido — capture GPS e fotos','info');}
 function confirmDel(){if(confirm('Remover este poste?')){delById(curId);closeMod();}}
 function clearAll(){
