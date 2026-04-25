@@ -7,6 +7,9 @@
 <title>PosteGPS — Painel Supervisor</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -203,6 +206,36 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
 }
 .bin-save:hover{box-shadow:0 6px 20px rgba(245,166,35,.4);transform:translateY(-1px)}
 
+/* ── ALERT BADGE ── */
+.no-photo-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);
+  color:var(--rd);border-radius:5px;font-size:10px;
+  font-family:'JetBrains Mono',monospace;padding:2px 7px;margin-top:4px;
+}
+/* ── EXPORT PANEL ── */
+.exp-bar{
+  display:flex;gap:8px;padding:10px 20px;
+  background:var(--sf);border-bottom:1px solid var(--bd);
+  flex-wrap:wrap;align-items:center;flex-shrink:0;
+}
+.exp-bar-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ac);font-family:'JetBrains Mono',monospace;margin-right:4px}
+.btn-exp{
+  height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--bd);
+  background:var(--sf2);color:var(--tx2);font-family:'Inter',sans-serif;
+  font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:all .15s;
+}
+.btn-exp:hover{border-color:var(--ac);color:var(--ac)}
+.btn-exp.kmz{background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;color:#000}
+.btn-exp.kmz:hover{box-shadow:0 4px 14px rgba(245,166,35,.4);color:#000}
+.btn-heat{
+  height:34px;padding:0 14px;border-radius:8px;
+  font-family:'Inter',sans-serif;font-weight:600;font-size:12px;
+  cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s;
+}
+.btn-heat.off{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2)}
+.btn-heat.on{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:var(--rd)}
 /* ── TOAST ── */
 .toast{
   position:fixed;bottom:24px;left:50%;
@@ -310,6 +343,18 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
   <button class="btn-clear" onclick="clearFilters()">✕ Limpar filtros</button>
 </div>
 
+<!-- EXPORT BAR -->
+<div class="exp-bar">
+  <span class="exp-bar-title">Exportar:</span>
+  <button class="btn-exp kmz" onclick="panelExportKMZ()">📦 KMZ</button>
+  <button class="btn-exp" onclick="panelExportKML()">📄 KML</button>
+  <button class="btn-exp" onclick="panelExportPDF()">📋 PDF</button>
+  <button class="btn-exp" onclick="panelExportCSV()">📊 CSV</button>
+  <div style="flex:1"></div>
+  <button class="btn-heat off" id="btnHeat" onclick="toggleHeatmap()">🔥 Heatmap</button>
+  <button class="btn-exp" onclick="filterNoPhoto()" id="btnNoPhoto">⚠️ Sem foto (<span id="noPhotoCount">0</span>)</button>
+</div>
+
 <!-- MAIN -->
 <div class="main">
   <div id="map"></div>
@@ -411,6 +456,7 @@ function updateStats(){
   document.getElementById('stHoje').textContent=poles.filter(p=>p.date&&p.date.includes(today)).length;
   document.getElementById('stTechs').textContent=new Set(poles.map(p=>p.tech).filter(Boolean)).size;
   document.getElementById('stPhotos').textContent=poles.filter(p=>p.hasPhotos>0).length;
+  updateNoPhotoCount();
   // Populate tech filter
   const techs=[...new Set(poles.map(p=>p.tech).filter(Boolean))];
   const sel=document.getElementById('filtTech');
@@ -421,6 +467,9 @@ function updateStats(){
 
 // ── FILTERS ───────────────────────────────────────────────────────────
 function applyFilters(){
+  noPhotoMode=false;
+  const btn=document.getElementById('btnNoPhoto');
+  if(btn){btn.style.background='';btn.style.borderColor='';btn.style.color='';}
   const tech=document.getElementById('filtTech').value;
   const type=document.getElementById('filtType').value;
   const search=document.getElementById('filtSearch').value.toLowerCase();
@@ -431,6 +480,8 @@ function applyFilters(){
     return true;
   });
   renderMap();renderList();
+  if(heatOn) showHeatmap();
+  updateNoPhotoCount();
 }
 function clearFilters(){
   document.getElementById('filtTech').value='';
@@ -499,7 +550,8 @@ function renderList(){
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
         ${p.tech?`<span class="pc-tech">👷 ${p.tech}</span>`:''}
         ${p.hasPhotos>0?`<span class="pc-photos">📷 ${p.hasPhotos} foto(s)</span>`:''}
-        ${(p.history||[]).length>0?`<span class="pc-photos" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25);color:var(--pu)">🔄 ${p.history.length} visita(s)</span>`:''}
+        ${(p.history||[]).length>0?`<span class="pc-photos" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25);color:var(--pu)">🔄 ${p.history.length} visita(s)</span>":''}
+        ${(!p.hasPhotos||p.hasPhotos===0)?'<span class="no-photo-badge">⚠️ Sem foto</span>':''}
       </div>
     </div>`).join('');
 }
@@ -519,6 +571,126 @@ function toast(msg,type='info'){
   const el=document.getElementById('toast');
   el.textContent=msg;el.className=`toast ${type} show`;
   clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// ── HEATMAP ──────────────────────────────────────────────────────────────
+let heatLayer = null;
+let heatOn = false;
+
+function toggleHeatmap(){
+  heatOn = !heatOn;
+  const btn = document.getElementById('btnHeat');
+  if(heatOn){
+    btn.className='btn-heat on';
+    btn.textContent='🔥 Heatmap ON';
+    showHeatmap();
+  } else {
+    btn.className='btn-heat off';
+    btn.textContent='🔥 Heatmap';
+    if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
+  }
+}
+
+function showHeatmap(){
+  if(heatLayer) map.removeLayer(heatLayer);
+  const pts = filtered.filter(p=>p.lat&&p.lng).map(p=>[parseFloat(p.lat),parseFloat(p.lng),1]);
+  if(!pts.length){ toast('Nenhum ponto para o heatmap','info'); return; }
+  heatLayer = L.heatLayer(pts,{radius:35,blur:20,maxZoom:17,gradient:{0.4:'blue',0.6:'lime',0.8:'yellow',1:'red'}}).addTo(map);
+}
+
+// ── NO PHOTO FILTER ───────────────────────────────────────────────────────
+let noPhotoMode = false;
+function filterNoPhoto(){
+  noPhotoMode = !noPhotoMode;
+  const btn = document.getElementById('btnNoPhoto');
+  if(noPhotoMode){
+    btn.style.background='rgba(239,68,68,.15)';
+    btn.style.borderColor='rgba(239,68,68,.4)';
+    btn.style.color='var(--rd)';
+    filtered = poles.filter(p=>!p.hasPhotos||p.hasPhotos===0);
+    renderMap(); renderList();
+    toast(`⚠️ ${filtered.length} poste(s) sem foto`,'info');
+  } else {
+    btn.style.background='';btn.style.borderColor='';btn.style.color='';
+    applyFilters();
+  }
+}
+
+// Update no photo count when data loads
+function updateNoPhotoCount(){
+  const cnt = poles.filter(p=>!p.hasPhotos||p.hasPhotos===0).length;
+  const el = document.getElementById('noPhotoCount');
+  if(el) el.textContent=cnt;
+  if(cnt>0) document.getElementById('btnNoPhoto').style.borderColor='rgba(239,68,68,.5)';
+}
+
+// ── PANEL EXPORTS ─────────────────────────────────────────────────────────
+function buildKML(fk){
+  const ps=filtered.map(p=>{
+    return `<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Modelo:</b>${p.model||'N/A'}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}<br/>${p.obs?`<b>Obs:</b>${p.obs}<br/>`:''}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>PosteGPS — Painel Supervisor</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
+}
+
+function panelDL(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);}
+
+function panelExportKML(){
+  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
+  panelDL(new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'}),'postes-painel.kml');
+  toast('📄 KML exportado!','ok');
+}
+
+async function panelExportKMZ(){
+  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
+  if(typeof JSZip==='undefined'){toast('Carregando...','info');setTimeout(panelExportKMZ,1000);return;}
+  toast('📦 Gerando KMZ...','info');
+  try{
+    const zip=new JSZip();
+    zip.file('doc.kml',buildKML(true));
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+    panelDL(blob,'postes-painel.kmz');
+    toast(`✅ KMZ: ${filtered.length} postes`,'ok');
+  }catch(e){toast('❌ Erro KMZ','er');}
+}
+
+function panelExportCSV(){
+  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
+  const sep=';';
+  const headers=['ID','Tipo','Modelo','Latitude','Longitude','Técnico','Data','Observação','Fotos','Visitas'];
+  const rows=filtered.map(p=>[p.poleId,p.type,p.model||'',p.lat,p.lng,p.tech||'',p.date,(p.obs||'').replace(/;/g,','),p.hasPhotos||0,(p.history||[]).length].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(sep));
+  const csv='﻿'+[headers.join(sep),...rows].join('
+');
+  panelDL(new Blob([csv],{type:'text/csv;charset=utf-8'}),'postes-painel.csv');
+  toast('📊 CSV exportado!','ok');
+}
+
+async function panelExportPDF(){
+  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
+  if(typeof window.jspdf==='undefined'){toast('Carregando...','info');setTimeout(panelExportPDF,1000);return;}
+  toast('📋 Gerando PDF...','info');
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,M=14,CW=W-M*2;let y=20;
+    doc.setFillColor(10,14,23);doc.rect(0,0,210,32,'F');
+    doc.setTextColor(245,166,35);doc.setFontSize(18);doc.setFont('helvetica','bold');
+    doc.text('PosteGPS — Relatório do Supervisor',M,18);
+    doc.setFontSize(9);doc.setTextColor(150,150,150);
+    doc.text(`${new Date().toLocaleString('pt-BR')}  •  ${filtered.length} poste(s)  •  ${new Set(filtered.map(p=>p.tech).filter(Boolean)).size} técnico(s)`,M,26);
+    y=42;
+    for(let i=0;i<filtered.length;i++){
+      const p=filtered[i];
+      if(y>255){doc.addPage();y=18;}
+      doc.setFillColor(245,166,35);doc.rect(M,y,CW,8,'F');
+      doc.setTextColor(0,0,0);doc.setFontSize(11);doc.setFont('helvetica','bold');
+      doc.text(`${i+1}.  ${p.poleId}  —  ${p.type}${p.model?' — '+p.model:''}`,M+3,y+5.5);y+=12;
+      doc.setTextColor(40,40,40);doc.setFontSize(9);doc.setFont('helvetica','normal');
+      [`Técnico: ${p.tech||'N/A'}`,`GPS: ${p.lat}, ${p.lng}`,`Data: ${p.date}`,`Fotos: ${p.hasPhotos||0}`,p.obs?`Obs: ${p.obs}`:null].filter(Boolean).forEach(l=>{doc.text(l,M,y);y+=5;});
+      doc.setDrawColor(230,230,230);doc.line(M,y+3,M+CW,y+3);y+=10;
+    }
+    doc.save(`relatorio-supervisor-${new Date().toISOString().slice(0,10)}.pdf`);
+    toast('✅ PDF gerado!','ok');
+  }catch(e){toast('❌ Erro PDF','er');}
 }
 
 init();
