@@ -272,7 +272,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
     <div class="logo-big">🔆</div>
     <h2>PosteGPS <span>Supervisor</span></h2>
     <p>Cole o BIN ID para conectar<br>aos dados dos técnicos em campo.</p>
-    <input class="bin-inp" id="binInput" placeholder="Cole o BIN ID aqui..." autocomplete="off">
+    <input class="bin-inp" id="binInput" placeholder="Cole o BIN ID aqui..." autocomplete="off" value="69ebc9af36566621a8eabcb7">
     <button class="bin-save" onclick="saveBin()">Conectar ao painel →</button>
   </div>
 </div>
@@ -407,19 +407,20 @@ function init(){
   // Custom zoom control position
   map.zoomControl.setPosition('bottomright');
 
-  // Auto connect
+  // Auto connect with fixed BIN ID
   document.getElementById('binSetup').style.display='none';
+  currentBin = FIXED_BIN_ID;
   loadData();
   setInterval(loadData, 30000);
 }
 
 // ── BIN SETUP ─────────────────────────────────────────────────────────
 function saveBin(){
-  const v=document.getElementById('binInput').value.trim();
-  if(!v){toast('⚠️ Cole o BIN ID','er');return;}
-  currentBin=v;localStorage.setItem('pgps_supervisor_bin',v);
+  const v=document.getElementById('binInput').value.trim()||FIXED_BIN_ID;
+  currentBin=v;
+  localStorage.setItem('pgps_supervisor_bin',v);
   document.getElementById('binSetup').style.display='none';
-  loadData();setInterval(loadData,30000);
+  loadData();
 }
 function changeBin(){
   document.getElementById('binInput').value=currentBin||'';
