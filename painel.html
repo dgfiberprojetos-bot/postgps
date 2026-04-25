@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache">
 <title>PosteGPS — Painel Supervisor</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -13,274 +12,82 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-:root{
-  --bg:#080c14;--sf:#0f1623;--sf2:#161e2e;--sf3:#1c2540;
-  --bd:#1e2d45;--bd2:#263554;
-  --ac:#f5a623;--ac2:#e85d04;
-  --gn:#22c55e;--rd:#ef4444;--bl:#3b82f6;--pu:#8b5cf6;
-  --tx:#e8edf5;--tx2:#a8b4c8;--mu:#546880;
-}
+:root{--bg:#080c14;--sf:#0f1623;--sf2:#161e2e;--sf3:#1c2540;--bd:#1e2d45;--bd2:#263554;--ac:#f5a623;--ac2:#e85d04;--gn:#22c55e;--rd:#ef4444;--bl:#3b82f6;--pu:#8b5cf6;--tx:#e8edf5;--tx2:#a8b4c8;--mu:#546880}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
 body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;font-size:14px}
-
-/* ── HEADER ── */
-.hdr{
-  background:linear-gradient(180deg,var(--sf) 0%,rgba(15,22,35,.95) 100%);
-  border-bottom:1px solid var(--bd);
-  padding:0 24px;height:62px;
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;gap:16px;
-  backdrop-filter:blur(10px);
-  position:sticky;top:0;z-index:50;
-}
-.hdr-left{display:flex;align-items:center;gap:14px}
-.logo{
-  width:38px;height:38px;
-  background:linear-gradient(135deg,var(--ac),var(--ac2));
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-size:18px;flex-shrink:0;
-  box-shadow:0 4px 12px rgba(245,166,35,.3);
-}
-.brand h1{font-size:17px;font-weight:800;letter-spacing:-.4px;line-height:1.2}
+.hdr{background:var(--sf);border-bottom:1px solid var(--bd);padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.logo{width:36px;height:36px;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.brand h1{font-size:16px;font-weight:800;letter-spacing:-.3px}
 .brand h1 span{color:var(--ac)}
-.brand p{font-size:11px;color:var(--mu);font-family:'JetBrains Mono',monospace;letter-spacing:.5px;text-transform:uppercase}
+.brand p{font-size:10px;color:var(--mu);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.5px}
 .hdr-right{display:flex;align-items:center;gap:8px}
-.sync-pill{
-  display:flex;align-items:center;gap:6px;
-  background:var(--sf2);border:1px solid var(--bd);
-  border-radius:20px;padding:5px 12px;
-  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx2);
-}
-.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--mu);flex-shrink:0}
-.sync-dot.ok{background:var(--gn);box-shadow:0 0 6px var(--gn);animation:pulse 2s infinite}
+.sync-pill{display:flex;align-items:center;gap:6px;background:var(--sf2);border:1px solid var(--bd);border-radius:20px;padding:5px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx2)}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--mu);flex-shrink:0;transition:background .3s}
+.sdot.ok{background:var(--gn);box-shadow:0 0 6px var(--gn);animation:pulse 2s infinite}
+.sdot.er{background:var(--rd)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.btn-hdr{
-  height:36px;padding:0 14px;border:none;border-radius:8px;
-  font-family:'Inter',sans-serif;font-weight:600;font-size:13px;
-  cursor:pointer;display:flex;align-items:center;gap:6px;
-  transition:all .15s;
-}
-.btn-hdr.primary{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#000}
-.btn-hdr.primary:hover{box-shadow:0 4px 14px rgba(245,166,35,.4);transform:translateY(-1px)}
-.btn-hdr.ghost{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2)}
-.btn-hdr.ghost:hover{border-color:var(--ac);color:var(--ac)}
-
-/* ── STATS BAR ── */
-.stats-bar{
-  background:var(--sf);border-bottom:1px solid var(--bd);
-  padding:12px 24px;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;
-}
-.stat{
-  background:var(--sf2);border:1px solid var(--bd);border-radius:10px;
-  padding:10px 16px;display:flex;align-items:center;gap:10px;
-  min-width:110px;flex:1;
-  transition:border-color .2s;
-}
-.stat:hover{border-color:var(--bd2)}
-.stat-icon{font-size:20px;flex-shrink:0}
-.stat-body{}
+.btn{height:34px;padding:0 14px;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#000}
+.btn-primary:hover{box-shadow:0 4px 12px rgba(245,166,35,.4)}
+.btn-ghost{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2)}
+.btn-ghost:hover{border-color:var(--ac);color:var(--ac)}
+.stats-bar{background:var(--sf);border-bottom:1px solid var(--bd);padding:10px 20px;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.stat{background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex:1;min-width:100px}
 .stat-num{font-size:22px;font-weight:800;color:var(--ac);line-height:1}
-.stat-lbl{font-size:10px;color:var(--mu);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
-
-/* ── FILTERS ── */
-.filters{
-  background:var(--sf2);border-bottom:1px solid var(--bd);
-  padding:10px 20px;display:flex;gap:8px;align-items:center;
-  flex-wrap:wrap;flex-shrink:0;
-}
-.flt-grp{display:flex;align-items:center;gap:6px}
+.stat-lbl{font-size:10px;color:var(--mu);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-top:1px}
+.filters{background:var(--sf2);border-bottom:1px solid var(--bd);padding:8px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
 .flt-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--mu);font-family:'JetBrains Mono',monospace;white-space:nowrap}
-.filters select,.filters input[type=text]{
-  background:var(--sf);border:1px solid var(--bd);border-radius:8px;
-  color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:12px;
-  padding:7px 10px;outline:none;transition:border-color .2s;
-  min-height:34px;
-}
-.filters select:focus,.filters input:focus{border-color:var(--ac)}
-.filters select option{background:var(--sf2)}
-.btn-clear{
-  background:none;border:1px solid var(--bd);border-radius:8px;
-  color:var(--mu);font-size:12px;font-family:'JetBrains Mono',monospace;
-  padding:7px 12px;cursor:pointer;transition:all .15s;height:34px;
-}
-.btn-clear:hover{border-color:var(--rd);color:var(--rd)}
-.flt-spacer{flex:1}
-
-/* ── MAIN ── */
-.main{display:flex;flex:1;overflow:hidden;min-height:0}
-#map{flex:1;min-height:400px}
-
-/* ── SIDEBAR ── */
-.sidebar{
-  width:340px;flex-shrink:0;
-  background:var(--sf);border-left:1px solid var(--bd);
-  display:flex;flex-direction:column;overflow:hidden;
-}
-.sidebar-hdr{
-  padding:14px 16px;border-bottom:1px solid var(--bd);
-  display:flex;align-items:center;justify-content:space-between;
-}
-.sidebar-hdr-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ac);font-family:'JetBrains Mono',monospace}
-.sidebar-count{background:var(--ac);color:#000;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700}
-.pole-list{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
-.pole-list::-webkit-scrollbar{width:4px}
-.pole-list::-webkit-scrollbar-track{background:transparent}
-.pole-list::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
-
-/* ── POLE CARD ── */
-.pole-card{
-  background:var(--sf2);border:1px solid var(--bd);border-radius:12px;
-  padding:12px 14px;cursor:pointer;
-  transition:all .2s;
-}
-.pole-card:hover{border-color:var(--bd2);transform:translateX(2px)}
-.pole-card.active{border-color:var(--ac);background:rgba(245,166,35,.06);box-shadow:0 0 0 1px rgba(245,166,35,.2)}
-.pc-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
-.pc-badge{
-  width:32px;height:32px;flex-shrink:0;
-  background:linear-gradient(135deg,var(--ac),var(--ac2));
-  border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:12px;color:#000;
-}
-.pc-info{flex:1;min-width:0}
-.pc-id{font-size:14px;font-weight:700;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pc-type{font-size:11px;color:var(--mu)}
-.pc-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu);line-height:1.8}
-.pc-tech{
-  display:inline-flex;align-items:center;gap:4px;margin-top:6px;
-  background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);
-  color:var(--bl);border-radius:5px;font-size:10px;font-family:'JetBrains Mono',monospace;
-  padding:2px 7px;
-}
-.pc-photos{
-  display:inline-flex;align-items:center;gap:4px;margin-top:6px;margin-left:4px;
-  background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);
-  color:var(--gn);border-radius:5px;font-size:10px;font-family:'JetBrains Mono',monospace;
-  padding:2px 7px;
-}
-
-/* ── EMPTY ── */
-.empty-list{text-align:center;padding:40px 16px;color:var(--mu)}
-.empty-list .ei{font-size:40px;margin-bottom:10px;opacity:.4}
-.empty-list p{font-size:13px;line-height:1.6}
-
-/* ── MAP POPUP ── */
-.lpopup{font-family:'Inter',sans-serif;font-size:12px;line-height:1.8;min-width:190px;max-width:240px}
-.lpopup .pt{font-size:15px;font-weight:700;margin-bottom:6px;color:#1a1a1a}
-.lpopup .pk{color:#888;font-size:11px}
-.lpopup .pv{color:#222;font-weight:500}
-
-/* ── BIN SETUP ── */
-.bin-setup{
-  position:fixed;inset:0;background:rgba(0,0,0,.92);
-  backdrop-filter:blur(8px);z-index:500;
-  display:none;align-items:center;justify-content:center;padding:20px;
-}
-.bin-setup.open{
-  display:flex;
-}
-.bin-box{
-  background:var(--sf);border:1px solid var(--bd);border-radius:20px;
-  padding:36px 32px;max-width:440px;width:100%;text-align:center;
-  box-shadow:0 24px 60px rgba(0,0,0,.5);
-}
-.bin-box .logo-big{
-  width:64px;height:64px;
-  background:linear-gradient(135deg,var(--ac),var(--ac2));
-  border-radius:16px;display:flex;align-items:center;justify-content:center;
-  font-size:30px;margin:0 auto 20px;
-  box-shadow:0 8px 24px rgba(245,166,35,.3);
-}
-.bin-box h2{font-size:22px;font-weight:800;margin-bottom:8px}
-.bin-box h2 span{color:var(--ac)}
-.bin-box p{font-size:13px;color:var(--tx2);margin-bottom:24px;line-height:1.7;font-family:'JetBrains Mono',monospace}
-.bin-inp{
-  width:100%;background:var(--sf2);border:1.5px solid var(--bd);
-  border-radius:10px;color:var(--tx);font-family:'JetBrains Mono',monospace;
-  font-size:14px;padding:13px 14px;outline:none;margin-bottom:12px;
-  transition:border-color .2s;
-}
-.bin-inp:focus{border-color:var(--ac)}
-.bin-save{
-  width:100%;background:linear-gradient(135deg,var(--ac),var(--ac2));
-  border:none;border-radius:10px;color:#000;
-  font-family:'Inter',sans-serif;font-weight:800;font-size:15px;
-  padding:14px;cursor:pointer;transition:all .2s;
-}
-.bin-save:hover{box-shadow:0 6px 20px rgba(245,166,35,.4);transform:translateY(-1px)}
-
-/* ── ALERT BADGE ── */
-.no-photo-badge{
-  display:inline-flex;align-items:center;gap:4px;
-  background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);
-  color:var(--rd);border-radius:5px;font-size:10px;
-  font-family:'JetBrains Mono',monospace;padding:2px 7px;margin-top:4px;
-}
-/* ── EXPORT PANEL ── */
-.exp-bar{
-  display:flex;gap:8px;padding:10px 20px;
-  background:var(--sf);border-bottom:1px solid var(--bd);
-  flex-wrap:wrap;align-items:center;flex-shrink:0;
-}
-.exp-bar-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ac);font-family:'JetBrains Mono',monospace;margin-right:4px}
-.btn-exp{
-  height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--bd);
-  background:var(--sf2);color:var(--tx2);font-family:'Inter',sans-serif;
-  font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;
-  transition:all .15s;
-}
+.flt-sel,.flt-inp{background:var(--sf);border:1px solid var(--bd);border-radius:7px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 10px;outline:none;height:32px;transition:border-color .2s}
+.flt-sel:focus,.flt-inp:focus{border-color:var(--ac)}
+.flt-sel option{background:var(--sf2)}
+.flt-sp{flex:1}
+.exp-bar{background:var(--sf);border-bottom:1px solid var(--bd);padding:8px 20px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.exp-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ac);font-family:'JetBrains Mono',monospace;margin-right:2px}
+.btn-exp{height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--sf2);color:var(--tx2);font-family:'Inter',sans-serif;font-weight:600;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
 .btn-exp:hover{border-color:var(--ac);color:var(--ac)}
 .btn-exp.kmz{background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;color:#000}
-.btn-exp.kmz:hover{box-shadow:0 4px 14px rgba(245,166,35,.4);color:#000}
-.btn-heat{
-  height:34px;padding:0 14px;border-radius:8px;
-  font-family:'Inter',sans-serif;font-weight:600;font-size:12px;
-  cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s;
-}
-.btn-heat.off{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2)}
-.btn-heat.on{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:var(--rd)}
-/* ── TOAST ── */
-.toast{
-  position:fixed;bottom:24px;left:50%;
-  transform:translateX(-50%) translateY(60px);
-  background:var(--sf);border:1px solid var(--bd);border-radius:30px;
-  padding:11px 22px;font-size:13px;font-weight:600;
-  display:flex;align-items:center;gap:8px;
-  box-shadow:0 8px 30px rgba(0,0,0,.6);
-  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
-  z-index:999;white-space:nowrap;
-}
+.btn-exp.kmz:hover{box-shadow:0 4px 12px rgba(245,166,35,.35);color:#000}
+.btn-heat{height:30px;padding:0 12px;border-radius:7px;font-family:'Inter',sans-serif;font-weight:600;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;background:var(--sf2);border:1px solid var(--bd);color:var(--tx2)}
+.btn-heat.on{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:var(--rd)}
+.btn-nophoto{height:30px;padding:0 12px;border-radius:7px;font-family:'Inter',sans-serif;font-weight:600;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;background:var(--sf2);border:1px solid var(--bd);color:var(--tx2);transition:all .15s}
+.btn-nophoto:hover{border-color:rgba(239,68,68,.4);color:var(--rd)}
+.main{display:flex;flex:1;overflow:hidden;min-height:0}
+#map{flex:1;min-height:300px}
+.sidebar{width:320px;flex-shrink:0;background:var(--sf);border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.sb-hdr{padding:12px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.sb-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ac);font-family:'JetBrains Mono',monospace}
+.sb-count{background:var(--ac);color:#000;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700}
+.pole-list{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px}
+.pole-list::-webkit-scrollbar{width:3px}
+.pole-list::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.pc{background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:11px 13px;cursor:pointer;transition:all .2s}
+.pc:hover{border-color:var(--bd2);transform:translateX(2px)}
+.pc.active{border-color:var(--ac);background:rgba(245,166,35,.05)}
+.pc-top{display:flex;align-items:flex-start;gap:9px;margin-bottom:7px}
+.pc-num{width:30px;height:30px;flex-shrink:0;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#000}
+.pc-id{font-size:13px;font-weight:700;margin-bottom:1px}
+.pc-type{font-size:11px;color:var(--mu)}
+.pc-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu);line-height:1.8}
+.pc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tag{display:inline-flex;align-items:center;gap:3px;border-radius:4px;font-size:10px;font-family:'JetBrains Mono',monospace;padding:1px 6px;border:1px solid}
+.tag-tech{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--bl)}
+.tag-photo{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:var(--gn)}
+.tag-visit{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:var(--pu)}
+.tag-nophoto{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--rd)}
+.empty-list{text-align:center;padding:40px 16px;color:var(--mu)}
+.empty-list .ei{font-size:36px;margin-bottom:10px;opacity:.4}
+.empty-list p{font-size:13px;line-height:1.6}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--sf);border:1px solid var(--bd);border-radius:30px;padding:10px 20px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:999;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--gn);color:var(--gn)}
 .toast.er{border-color:var(--rd);color:var(--rd)}
 .toast.info{border-color:var(--ac);color:var(--ac)}
-
-/* ── RESPONSIVE ── */
-@media(max-width:768px){
-  .main{flex-direction:column}
-  #map{min-height:50vh;flex:none}
-  .sidebar{width:100%;border-left:none;border-top:1px solid var(--bd);max-height:40vh}
-  .stats-bar{padding:10px 14px}
-  .stat{min-width:80px}
-  .hdr{padding:0 16px}
-  .filters{padding:8px 14px}
-}
+@media(max-width:768px){.main{flex-direction:column}#map{min-height:50vh;flex:none}.sidebar{width:100%;border-left:none;border-top:1px solid var(--bd);max-height:40vh}.stats-bar{padding:8px 12px}.hdr{padding:0 14px}}
 </style>
 </head>
 <body>
 
-<!-- BIN SETUP -->
-<div class="bin-setup" id="binSetup" style="display:none">
-  <div class="bin-box">
-    <div class="logo-big">🔆</div>
-    <h2>PosteGPS <span>Supervisor</span></h2>
-    <p>Cole o BIN ID para conectar<br>aos dados dos técnicos em campo.</p>
-    <input class="bin-inp" id="binInput" placeholder="Cole o BIN ID aqui..." autocomplete="off" value="69ebc9af36566621a8eabcb7">
-    <button class="bin-save" onclick="saveBin()">Conectar ao painel →</button>
-  </div>
-</div>
-
-<!-- HEADER -->
 <div class="hdr">
   <div class="hdr-left">
     <div class="logo">🔆</div>
@@ -290,84 +97,53 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
     </div>
   </div>
   <div class="hdr-right">
-    <div class="sync-pill">
-      <div class="sync-dot" id="syncDot"></div>
-      <span id="syncInfo">Aguardando...</span>
-    </div>
-    <button class="btn-hdr primary" onclick="loadData()">🔄 Atualizar</button>
-    <button class="btn-hdr ghost" onclick="changeBin()">⚙️</button>
+    <div class="sync-pill"><div class="sdot" id="sdot"></div><span id="sinfo">Aguardando...</span></div>
+    <button class="btn btn-primary" onclick="loadData()">🔄 Atualizar</button>
   </div>
 </div>
 
-<!-- STATS -->
 <div class="stats-bar">
-  <div class="stat">
-    <div class="stat-icon">🔆</div>
-    <div class="stat-body"><div class="stat-num" id="stTotal">0</div><div class="stat-lbl">Total Postes</div></div>
-  </div>
-  <div class="stat">
-    <div class="stat-icon">📅</div>
-    <div class="stat-body"><div class="stat-num" id="stHoje">0</div><div class="stat-lbl">Hoje</div></div>
-  </div>
-  <div class="stat">
-    <div class="stat-icon">👷</div>
-    <div class="stat-body"><div class="stat-num" id="stTechs">0</div><div class="stat-lbl">Técnicos</div></div>
-  </div>
-  <div class="stat">
-    <div class="stat-icon">📷</div>
-    <div class="stat-body"><div class="stat-num" id="stPhotos">0</div><div class="stat-lbl">Com Fotos</div></div>
-  </div>
+  <div class="stat"><div><div class="stat-num" id="stT">0</div><div class="stat-lbl">Total</div></div></div>
+  <div class="stat"><div><div class="stat-num" id="stH">0</div><div class="stat-lbl">Hoje</div></div></div>
+  <div class="stat"><div><div class="stat-num" id="stTe">0</div><div class="stat-lbl">Técnicos</div></div></div>
+  <div class="stat"><div><div class="stat-num" id="stP">0</div><div class="stat-lbl">Com fotos</div></div></div>
 </div>
 
-<!-- FILTERS -->
 <div class="filters">
-  <div class="flt-grp">
-    <span class="flt-lbl">Técnico</span>
-    <select id="filtTech" onchange="applyFilters()">
-      <option value="">Todos</option>
-    </select>
-  </div>
-  <div class="flt-grp">
-    <span class="flt-lbl">Tipo</span>
-    <select id="filtType" onchange="applyFilters()">
-      <option value="">Todos</option>
-      <option value="Concreto">Concreto</option>
-      <option value="Metálico">Metálico</option>
-      <option value="Madeira">Madeira</option>
-      <option value="Fibra de Vidro">Fibra de Vidro</option>
-      <option value="Poste com Transformador">Com Transformador</option>
-    </select>
-  </div>
-  <div class="flt-grp">
-    <span class="flt-lbl">Buscar</span>
-    <input type="text" id="filtSearch" placeholder="ID do poste..." oninput="applyFilters()">
-  </div>
-  <div class="flt-spacer"></div>
-  <button class="btn-clear" onclick="clearFilters()">✕ Limpar filtros</button>
+  <span class="flt-lbl">Técnico</span>
+  <select class="flt-sel" id="fTech" onchange="applyF()"><option value="">Todos</option></select>
+  <span class="flt-lbl">Tipo</span>
+  <select class="flt-sel" id="fType" onchange="applyF()">
+    <option value="">Todos</option>
+    <option>Concreto</option><option>Metálico</option><option>Madeira</option>
+    <option>Fibra de Vidro</option><option>Poste com Transformador</option>
+  </select>
+  <span class="flt-lbl">Buscar</span>
+  <input class="flt-inp" id="fSearch" placeholder="ID..." oninput="applyF()" style="width:100px">
+  <div class="flt-sp"></div>
+  <button class="btn btn-ghost" onclick="clearF()">✕ Limpar</button>
 </div>
 
-<!-- EXPORT BAR -->
 <div class="exp-bar">
-  <span class="exp-bar-title">Exportar:</span>
-  <button class="btn-exp kmz" onclick="panelExportKMZ()">📦 KMZ</button>
-  <button class="btn-exp" onclick="panelExportKML()">📄 KML</button>
-  <button class="btn-exp" onclick="panelExportPDF()">📋 PDF</button>
-  <button class="btn-exp" onclick="panelExportCSV()">📊 CSV</button>
-  <div style="flex:1"></div>
-  <button class="btn-heat off" id="btnHeat" onclick="toggleHeatmap()">🔥 Heatmap</button>
-  <button class="btn-exp" onclick="filterNoPhoto()" id="btnNoPhoto">⚠️ Sem foto (<span id="noPhotoCount">0</span>)</button>
+  <span class="exp-lbl">Exportar:</span>
+  <button class="btn-exp kmz" onclick="expKMZ()">📦 KMZ</button>
+  <button class="btn-exp" onclick="expKML()">📄 KML</button>
+  <button class="btn-exp" onclick="expPDF()">📋 PDF</button>
+  <button class="btn-exp" onclick="expCSV()">📊 CSV</button>
+  <div class="flt-sp"></div>
+  <button class="btn-heat" id="btnHeat" onclick="toggleHeat()">🔥 Heatmap</button>
+  <button class="btn-nophoto" onclick="filterNoPhoto()">⚠️ Sem foto (<span id="npCount">0</span>)</button>
 </div>
 
-<!-- MAIN -->
 <div class="main">
   <div id="map"></div>
   <div class="sidebar">
-    <div class="sidebar-hdr">
-      <span class="sidebar-hdr-title">Lista de Postes</span>
-      <span class="sidebar-count" id="listCount">0</span>
+    <div class="sb-hdr">
+      <span class="sb-title">Lista de Postes</span>
+      <span class="sb-count" id="sbCount">0</span>
     </div>
     <div class="pole-list" id="poleList">
-      <div class="empty-list"><div class="ei">🗺️</div><p>Conectando ao banco de dados...</p></div>
+      <div class="empty-list"><div class="ei">🗺️</div><p>Carregando dados...</p></div>
     </div>
   </div>
 </div>
@@ -375,138 +151,104 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
 <div class="toast" id="toast"></div>
 
 <script>
-const JKEY = '$2a$10$AsRx5rC8JX7R/Hvab5G9VOh4H47/tSun0quWwboI9eDZ7VMOG8CDW';
-const JBASE = 'https://api.jsonbin.io/v3';
-const FIXED_BIN_ID = '69ebc9af36566621a8eabcb7';
-let poles = [], filtered = [], map, markers = [];
-let currentBin = FIXED_BIN_ID;
+// ── CONFIG ────────────────────────────────────────────────────────────
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRaVdTbSME5mD1s2CH0RWbUmNauM8b4_QYINGntHTtG8OUtDRsaxkHu1_550oYxBVFdHwVNtX3C4-v0/pub?output=csv';
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let poles=[], filtered=[], map, markers=[], heatLayer=null, heatOn=false, npMode=false;
 
 // ── INIT ──────────────────────────────────────────────────────────────
 function init(){
-  map = L.map('map',{zoomControl:true}).setView([-2.45,-54.71],12);
-  // Google Satellite
-  const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
-    attribution:'© Google',maxZoom:21,maxNativeZoom:21
-  });
-  // Google Hybrid (satellite + roads/labels)
-  const hybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{
-    attribution:'© Google',maxZoom:21,maxNativeZoom:21
-  });
-  // Google Streets
-  const streets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
-    attribution:'© Google',maxZoom:21,maxNativeZoom:21
-  });
-
-  // Default: hybrid (satellite + nomes)
+  map = L.map('map').setView([-2.45,-54.71],13);
+  
+  // Google Hybrid as default
+  const hybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:21});
+  const sat    = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:21});
+  const street = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:21});
   hybrid.addTo(map);
-
-  // Layer control
-  const baseMaps = {
-    '🛰️ Satélite': satellite,
-    '🛰️ Satélite + Ruas': hybrid,
-    '🗺️ Mapa de Ruas': streets
-  };
-  L.control.layers(baseMaps, {}, {position:'topright'}).addTo(map);
-  // Custom zoom control position
-  map.zoomControl.setPosition('bottomright');
-
-  // Auto connect with fixed BIN ID
-  document.getElementById('binSetup').style.display='none';
-  currentBin = FIXED_BIN_ID;
+  L.control.layers({'🛰️ Satélite+Ruas':hybrid,'🛰️ Satélite':sat,'🗺️ Ruas':street},{},{position:'topright'}).addTo(map);
+  
   loadData();
   setInterval(loadData, 30000);
 }
 
-// ── BIN SETUP ─────────────────────────────────────────────────────────
-function saveBin(){
-  const v=document.getElementById('binInput').value.trim()||FIXED_BIN_ID;
-  currentBin=v;
-  localStorage.setItem('pgps_supervisor_bin',v);
-  document.getElementById('binSetup').style.display='none';
-  loadData();
-}
-function changeBin(){
-  document.getElementById('binInput').value=currentBin||FIXED_BIN_ID;
-  document.getElementById('binSetup').style.display='flex';
-  document.getElementById('binSetup').style.alignItems='center';
-  document.getElementById('binSetup').style.justifyContent='center';
-}
-
 // ── LOAD DATA ─────────────────────────────────────────────────────────
 async function loadData(){
-  const dot=document.getElementById('syncDot');
-  const info=document.getElementById('syncInfo');
-  dot.className='sync-dot';
+  const dot=document.getElementById('sdot');
+  const info=document.getElementById('sinfo');
   info.textContent='Carregando...';
+  dot.className='sdot';
   try{
-    // Read from Google Sheets - no CORS issues!
-    const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRaVdTbSME5mD1s2CH0RWbUmNauM8b4_QYINGntHTtG8OUtDRsaxkHu1_550oYxBVFdHwVNtX3C4-v0/pub?output=csv&t='+Date.now();
-    const r = await fetch(url);
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const csv = await r.text();
-    
-    // Parse CSV
-    const lines = csv.trim().split('\n');
-    if(lines.length < 2){ poles=[]; applyFilters(); updateStats(); return; }
-    
-    const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
-    poles = lines.slice(1).filter(l=>l.trim()).map(line=>{
-      // Handle CSV with commas inside quotes
-      const cols = [];
-      let cur='', inQ=false;
-      for(let i=0;i<line.length;i++){
-        if(line[i]==='"'){ inQ=!inQ; }
-        else if(line[i]===','&&!inQ){ cols.push(cur); cur=''; }
-        else { cur+=line[i]; }
-      }
-      cols.push(cur);
-      const obj={};
-      headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
-      // Convert numeric fields
-      obj.lat = parseFloat(obj.lat)||0;
-      obj.lng = parseFloat(obj.lng)||0;
-      obj.hasPhotos = parseInt(obj.hasPhotos)||0;
-      try{ obj.history = obj.history ? JSON.parse(obj.history) : []; }catch(e){ obj.history=[]; }
-      return obj;
-    }).filter(p=>p.lat&&p.lng);
-
-    const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    dot.className='sync-dot ok';
-    info.textContent=`Atualizado ${now}`;
-    applyFilters(); updateStats();
-    toast(`📡 ${poles.length} poste(s) carregado(s)`,'ok');
-  }catch(e){
-    console.error(e);
-    dot.style.background='var(--rd)';
-    info.textContent='Erro de conexão';
-    toast('❌ Erro ao carregar dados','er');
+    const url = CSV_URL + '&nocache=' + Date.now();
+    const resp = await fetch(url, {cache:'no-store'});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const text = await resp.text();
+    poles = parseCSV(text);
+    dot.className='sdot ok';
+    info.textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    applyF();
+    updateStats();
+    toast('📡 '+poles.length+' poste(s) carregado(s)','ok');
+  }catch(err){
+    console.error('loadData error:',err);
+    dot.className='sdot er';
+    info.textContent='Erro: '+err.message;
+    toast('❌ Erro ao carregar: '+err.message,'er');
   }
+}
+
+// ── PARSE CSV ─────────────────────────────────────────────────────────
+function parseCSV(text){
+  const lines = text.trim().split('\n');
+  if(lines.length < 2) return [];
+  const hdrs = splitCSVLine(lines[0]);
+  return lines.slice(1).filter(l=>l.trim()).map(line=>{
+    const cols = splitCSVLine(line);
+    const obj = {};
+    hdrs.forEach((h,i)=>{ obj[h.trim()] = (cols[i]||'').trim(); });
+    obj.lat = parseFloat(obj.lat)||0;
+    obj.lng = parseFloat(obj.lng)||0;
+    obj.hasPhotos = parseInt(obj.hasPhotos)||0;
+    try{ obj.history = obj.history ? JSON.parse(obj.history) : []; }catch(e){ obj.history=[]; }
+    return obj;
+  }).filter(p=>p.lat&&p.lng&&p.poleId);
+}
+
+function splitCSVLine(line){
+  const cols=[]; let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"'){ inQ=!inQ; }
+    else if(line[i]===','&&!inQ){ cols.push(cur); cur=''; }
+    else{ cur+=line[i]; }
+  }
+  cols.push(cur);
+  return cols;
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────
 function updateStats(){
-  document.getElementById('stTotal').textContent=poles.length;
+  document.getElementById('stT').textContent=poles.length;
   const today=new Date().toLocaleDateString('pt-BR');
-  document.getElementById('stHoje').textContent=poles.filter(p=>p.date&&p.date.includes(today)).length;
-  document.getElementById('stTechs').textContent=new Set(poles.map(p=>p.tech).filter(Boolean)).size;
-  document.getElementById('stPhotos').textContent=poles.filter(p=>p.hasPhotos>0).length;
-  updateNoPhotoCount();
+  document.getElementById('stH').textContent=poles.filter(p=>p.date&&p.date.includes(today)).length;
+  document.getElementById('stTe').textContent=new Set(poles.map(p=>p.tech).filter(Boolean)).size;
+  document.getElementById('stP').textContent=poles.filter(p=>p.hasPhotos>0).length;
+  document.getElementById('npCount').textContent=poles.filter(p=>!p.hasPhotos||p.hasPhotos===0).length;
   // Populate tech filter
-  const techs=[...new Set(poles.map(p=>p.tech).filter(Boolean))];
-  const sel=document.getElementById('filtTech');
+  const sel=document.getElementById('fTech');
   const cur=sel.value;
+  const techs=[...new Set(poles.map(p=>p.tech).filter(Boolean))];
   sel.innerHTML='<option value="">Todos</option>'+techs.map(t=>`<option value="${t}">${t}</option>`).join('');
   sel.value=cur;
 }
 
 // ── FILTERS ───────────────────────────────────────────────────────────
-function applyFilters(){
-  noPhotoMode=false;
-  const btn=document.getElementById('btnNoPhoto');
-  if(btn){btn.style.background='';btn.style.borderColor='';btn.style.color='';}
-  const tech=document.getElementById('filtTech').value;
-  const type=document.getElementById('filtType').value;
-  const search=document.getElementById('filtSearch').value.toLowerCase();
+function applyF(){
+  npMode=false;
+  document.querySelector('.btn-nophoto').style.color='';
+  document.querySelector('.btn-nophoto').style.borderColor='';
+  const tech=document.getElementById('fTech').value;
+  const type=document.getElementById('fType').value;
+  const search=document.getElementById('fSearch').value.toLowerCase();
   filtered=poles.filter(p=>{
     if(tech&&p.tech!==tech)return false;
     if(type&&p.type!==type)return false;
@@ -514,216 +256,181 @@ function applyFilters(){
     return true;
   });
   renderMap();renderList();
-  if(heatOn) showHeatmap();
-  updateNoPhotoCount();
+  if(heatOn)showHeat();
 }
-function clearFilters(){
-  document.getElementById('filtTech').value='';
-  document.getElementById('filtType').value='';
-  document.getElementById('filtSearch').value='';
-  applyFilters();
+
+function clearF(){
+  document.getElementById('fTech').value='';
+  document.getElementById('fType').value='';
+  document.getElementById('fSearch').value='';
+  applyF();
+}
+
+function filterNoPhoto(){
+  npMode=!npMode;
+  const btn=document.querySelector('.btn-nophoto');
+  if(npMode){
+    btn.style.color='var(--rd)';btn.style.borderColor='rgba(239,68,68,.4)';
+    filtered=poles.filter(p=>!p.hasPhotos||p.hasPhotos===0);
+  } else {
+    btn.style.color='';btn.style.borderColor='';
+    applyF();return;
+  }
+  renderMap();renderList();
 }
 
 // ── MAP ───────────────────────────────────────────────────────────────
 function renderMap(){
-  markers.forEach(m=>map.removeLayer(m));markers=[];
+  markers.forEach(m=>map.removeLayer(m)); markers=[];
   if(!filtered.length)return;
   const bounds=[];
   filtered.forEach((p,i)=>{
     if(!p.lat||!p.lng)return;
-    const color = p.hasPhotos>0 ? '#22c55e' : '#f5a623';
+    const color=p.hasPhotos>0?'#22c55e':'#f5a623';
     const icon=L.divIcon({
-      html:`<div style="
-        width:34px;height:34px;
-        background:linear-gradient(135deg,${color},${color}cc);
-        border-radius:50% 50% 50% 0;
-        transform:rotate(-45deg);
-        border:2px solid rgba(255,255,255,.9);
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 3px 10px rgba(0,0,0,.4);
-      "><span style="transform:rotate(45deg);font-size:11px;font-weight:800;color:#000">${i+1}</span></div>`,
-      className:'',iconSize:[34,34],iconAnchor:[17,34]
+      html:`<div style="width:32px;height:32px;background:${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:11px;font-weight:800;color:#000">${i+1}</span></div>`,
+      className:'',iconSize:[32,32],iconAnchor:[16,32]
     });
-    const m=L.marker([p.lat,p.lng],{icon}).addTo(map)
-      .bindPopup(`<div class="lpopup">
-        <div class="pt">Poste ${p.poleId}</div>
-        <div><span class="pk">Tipo: </span><span class="pv">${p.type}${p.model?' — '+p.model:''}</span></div>
-        <div><span class="pk">Técnico: </span><span class="pv">${p.tech||'N/A'}</span></div>
-        <div><span class="pk">Data: </span><span class="pv">${p.date}</span></div>
-        ${p.obs?`<div><span class="pk">Obs: </span><span class="pv">${p.obs}</span></div>`:''}
-        <div><span class="pk">Fotos: </span><span class="pv">${p.hasPhotos||0}</span></div>
-        <div><span class="pk">GPS: </span><span class="pv" style="font-family:monospace;font-size:10px">${parseFloat(p.lat).toFixed(5)}, ${parseFloat(p.lng).toFixed(5)}</span></div>
-      </div>`);
-    m.on('click',()=>highlightCard(p.id));
-    markers.push(m);bounds.push([p.lat,p.lng]);
+    const popup = `<div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.8;min-width:180px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Poste ${p.poleId}</div>
+      <div><b>Tipo:</b> ${p.type}${p.model?' — '+p.model:''}</div>
+      <div><b>Técnico:</b> ${p.tech||'N/A'}</div>
+      <div><b>Data:</b> ${p.date}</div>
+      ${p.obs?`<div><b>Obs:</b> ${p.obs}</div>`:''}
+      <div><b>Fotos:</b> ${p.hasPhotos||0}</div>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" style="background:#f5a623;color:#000;padding:4px 10px;border-radius:6px;font-weight:700;font-size:11px;text-decoration:none">🗺 Maps</a>
+        <a href="https://waze.com/ul?ll=${p.lat},${p.lng}&navigate=yes" target="_blank" style="background:#33ccff;color:#000;padding:4px 10px;border-radius:6px;font-weight:700;font-size:11px;text-decoration:none">🚗 Waze</a>
+      </div>
+    </div>`;
+    const m=L.marker([p.lat,p.lng],{icon}).addTo(map).bindPopup(popup);
+    m.on('click',()=>highlightCard(p.id||p.poleId));
+    markers.push(m);
+    bounds.push([p.lat,p.lng]);
   });
-  if(bounds.length) map.fitBounds(bounds,{padding:[40,40],maxZoom:16});
+  if(bounds.length) map.fitBounds(bounds,{padding:[30,30],maxZoom:16});
+}
+
+// ── HEATMAP ───────────────────────────────────────────────────────────
+function toggleHeat(){
+  heatOn=!heatOn;
+  const btn=document.getElementById('btnHeat');
+  if(heatOn){ btn.className='btn-heat on'; btn.textContent='🔥 Heatmap ON'; showHeat(); }
+  else{ btn.className='btn-heat'; btn.textContent='🔥 Heatmap'; if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;} }
+}
+function showHeat(){
+  if(heatLayer) map.removeLayer(heatLayer);
+  const pts=filtered.filter(p=>p.lat&&p.lng).map(p=>[p.lat,p.lng,1]);
+  if(!pts.length) return;
+  heatLayer=L.heatLayer(pts,{radius:35,blur:20,gradient:{0.4:'blue',0.6:'lime',0.8:'yellow',1:'red'}}).addTo(map);
 }
 
 // ── LIST ──────────────────────────────────────────────────────────────
 function renderList(){
   const list=document.getElementById('poleList');
-  document.getElementById('listCount').textContent=filtered.length;
+  document.getElementById('sbCount').textContent=filtered.length;
   if(!filtered.length){
     list.innerHTML='<div class="empty-list"><div class="ei">🔍</div><p>Nenhum poste encontrado</p></div>';
     return;
   }
   list.innerHTML=filtered.map((p,i)=>`
-    <div class="pole-card" id="card-${p.id}" onclick="focusPole(${i},'${p.id}')">
+    <div class="pc" id="pc-${p.id||p.poleId}" onclick="focusPole(${i},'${p.id||p.poleId}')">
       <div class="pc-top">
-        <div class="pc-badge">${i+1}</div>
-        <div class="pc-info">
+        <div class="pc-num">${i+1}</div>
+        <div>
           <div class="pc-id">${p.poleId}</div>
           <div class="pc-type">${p.type}${p.model?' · '+p.model:''}</div>
         </div>
       </div>
-      <div class="pc-meta">
-        📍 ${parseFloat(p.lat).toFixed(4)}, ${parseFloat(p.lng).toFixed(4)}<br>
-        🕐 ${p.date}
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
-        ${p.tech?`<span class="pc-tech">👷 ${p.tech}</span>`:''}
-        ${p.hasPhotos>0?`<span class="pc-photos">📷 ${p.hasPhotos} foto(s)</span>`:''}
-        ${(p.history||[]).length>0?`<span class="pc-photos" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25);color:var(--pu)">🔄 ${p.history.length} visita(s)</span>`:''}
-        ${(!p.hasPhotos||p.hasPhotos===0)?'<span class="no-photo-badge">⚠️ Sem foto</span>':''}
+      <div class="pc-meta">📍 ${parseFloat(p.lat).toFixed(4)}, ${parseFloat(p.lng).toFixed(4)}<br>🕐 ${p.date}</div>
+      <div class="pc-tags">
+        ${p.tech?`<span class="tag tag-tech">👷 ${p.tech}</span>`:''}
+        ${p.hasPhotos>0?`<span class="tag tag-photo">📷 ${p.hasPhotos}</span>`:'<span class="tag tag-nophoto">⚠️ Sem foto</span>'}
+        ${(p.history||[]).length>0?`<span class="tag tag-visit">🔄 ${p.history.length}</span>`:''}
       </div>
     </div>`).join('');
 }
 
-function focusPole(idx,id){
-  if(markers[idx]){map.setView(markers[idx].getLatLng(),17);markers[idx].openPopup();}
-  highlightCard(id);
+function focusPole(i,id){
+  if(markers[i]){map.setView(markers[i].getLatLng(),18);markers[i].openPopup();}
+  document.querySelectorAll('.pc').forEach(c=>c.classList.remove('active'));
+  const el=document.getElementById('pc-'+id);
+  if(el){el.classList.add('active');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
 }
 function highlightCard(id){
-  document.querySelectorAll('.pole-card').forEach(c=>c.classList.remove('active'));
-  const card=document.getElementById('card-'+id);
-  if(card){card.classList.add('active');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  document.querySelectorAll('.pc').forEach(c=>c.classList.remove('active'));
+  const el=document.getElementById('pc-'+id);
+  if(el){el.classList.add('active');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
 }
 
-let tt;
-function toast(msg,type='info'){
-  const el=document.getElementById('toast');
-  el.textContent=msg;el.className=`toast ${type} show`;
-  clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200);
+// ── EXPORTS ───────────────────────────────────────────────────────────
+function dlBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);}
+
+function buildKML(){
+  const ps=filtered.map(p=>`<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>PosteGPS Supervisor</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
 }
 
-// ── HEATMAP ──────────────────────────────────────────────────────────────
-let heatLayer = null;
-let heatOn = false;
-
-function toggleHeatmap(){
-  heatOn = !heatOn;
-  const btn = document.getElementById('btnHeat');
-  if(heatOn){
-    btn.className='btn-heat on';
-    btn.textContent='🔥 Heatmap ON';
-    showHeatmap();
-  } else {
-    btn.className='btn-heat off';
-    btn.textContent='🔥 Heatmap';
-    if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
-  }
-}
-
-function showHeatmap(){
-  if(heatLayer) map.removeLayer(heatLayer);
-  const pts = filtered.filter(p=>p.lat&&p.lng).map(p=>[parseFloat(p.lat),parseFloat(p.lng),1]);
-  if(!pts.length){ toast('Nenhum ponto para o heatmap','info'); return; }
-  heatLayer = L.heatLayer(pts,{radius:35,blur:20,maxZoom:17,gradient:{0.4:'blue',0.6:'lime',0.8:'yellow',1:'red'}}).addTo(map);
-}
-
-// ── NO PHOTO FILTER ───────────────────────────────────────────────────────
-let noPhotoMode = false;
-function filterNoPhoto(){
-  noPhotoMode = !noPhotoMode;
-  const btn = document.getElementById('btnNoPhoto');
-  if(noPhotoMode){
-    btn.style.background='rgba(239,68,68,.15)';
-    btn.style.borderColor='rgba(239,68,68,.4)';
-    btn.style.color='var(--rd)';
-    filtered = poles.filter(p=>!p.hasPhotos||p.hasPhotos===0);
-    renderMap(); renderList();
-    toast(`⚠️ ${filtered.length} poste(s) sem foto`,'info');
-  } else {
-    btn.style.background='';btn.style.borderColor='';btn.style.color='';
-    applyFilters();
-  }
-}
-
-// Update no photo count when data loads
-function updateNoPhotoCount(){
-  const cnt = poles.filter(p=>!p.hasPhotos||p.hasPhotos===0).length;
-  const el = document.getElementById('noPhotoCount');
-  if(el) el.textContent=cnt;
-  if(cnt>0) document.getElementById('btnNoPhoto').style.borderColor='rgba(239,68,68,.5)';
-}
-
-// ── PANEL EXPORTS ─────────────────────────────────────────────────────────
-function buildKML(fk){
-  const ps=filtered.map(p=>{
-    return `<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Modelo:</b>${p.model||'N/A'}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}<br/>${p.obs?`<b>Obs:</b>${p.obs}<br/>`:''}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
-  }).join('');
-  return `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>PosteGPS — Painel Supervisor</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
-}
-
-function panelDL(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);}
-
-function panelExportKML(){
-  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
-  panelDL(new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'}),'postes-painel.kml');
+function expKML(){
+  if(!filtered.length){toast('Nenhum poste','info');return;}
+  dlBlob(new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'}),'postes.kml');
   toast('📄 KML exportado!','ok');
 }
 
-async function panelExportKMZ(){
-  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
-  if(typeof JSZip==='undefined'){toast('Carregando...','info');setTimeout(panelExportKMZ,1000);return;}
-  toast('📦 Gerando KMZ...','info');
-  try{
-    const zip=new JSZip();
-    zip.file('doc.kml',buildKML(true));
-    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
-    panelDL(blob,'postes-painel.kmz');
-    toast(`✅ KMZ: ${filtered.length} postes`,'ok');
-  }catch(e){toast('❌ Erro KMZ','er');}
+async function expKMZ(){
+  if(!filtered.length){toast('Nenhum poste','info');return;}
+  if(typeof JSZip==='undefined'){toast('Aguarde...','info');setTimeout(expKMZ,1000);return;}
+  toast('📦 Gerando...','info');
+  const zip=new JSZip();zip.file('doc.kml',buildKML());
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+  dlBlob(blob,'postes.kmz');toast('✅ KMZ exportado!','ok');
 }
 
-function panelExportCSV(){
-  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
+function expCSV(){
+  if(!filtered.length){toast('Nenhum poste','info');return;}
   const sep=';';
-  const headers=['ID','Tipo','Modelo','Latitude','Longitude','Técnico','Data','Observação','Fotos','Visitas'];
+  const hds=['ID','Tipo','Modelo','Lat','Lng','Técnico','Data','Obs','Fotos','Visitas'];
   const rows=filtered.map(p=>[p.poleId,p.type,p.model||'',p.lat,p.lng,p.tech||'',p.date,(p.obs||'').replace(/;/g,','),p.hasPhotos||0,(p.history||[]).length].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(sep));
-  const csv='\uFEFF'+[headers.join(sep),...rows].join('\n');
-  panelDL(new Blob([csv],{type:'text/csv;charset=utf-8'}),'postes-painel.csv');
+  const csv='\uFEFF'+[hds.join(sep),...rows].join('\n');
+  dlBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),'postes.csv');
   toast('📊 CSV exportado!','ok');
 }
 
-async function panelExportPDF(){
-  if(!filtered.length){toast('⚠️ Nenhum poste','er');return;}
-  if(typeof window.jspdf==='undefined'){toast('Carregando...','info');setTimeout(panelExportPDF,1000);return;}
+async function expPDF(){
+  if(!filtered.length){toast('Nenhum poste','info');return;}
+  if(typeof window.jspdf==='undefined'){toast('Aguarde...','info');setTimeout(expPDF,1000);return;}
   toast('📋 Gerando PDF...','info');
   try{
     const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const W=210,M=14,CW=W-M*2;let y=20;
-    doc.setFillColor(10,14,23);doc.rect(0,0,210,32,'F');
-    doc.setTextColor(245,166,35);doc.setFontSize(18);doc.setFont('helvetica','bold');
-    doc.text('PosteGPS — Relatório do Supervisor',M,18);
+    const doc=new jsPDF({unit:'mm',format:'a4'});
+    const M=14,W=210,CW=W-M*2;let y=20;
+    doc.setFillColor(10,14,23);doc.rect(0,0,210,30,'F');
+    doc.setTextColor(245,166,35);doc.setFontSize(16);doc.setFont('helvetica','bold');
+    doc.text('PosteGPS — Painel Supervisor',M,16);
     doc.setFontSize(9);doc.setTextColor(150,150,150);
-    doc.text(`${new Date().toLocaleString('pt-BR')}  •  ${filtered.length} poste(s)  •  ${new Set(filtered.map(p=>p.tech).filter(Boolean)).size} técnico(s)`,M,26);
-    y=42;
+    doc.text(new Date().toLocaleString('pt-BR')+' • '+filtered.length+' poste(s)',M,24);
+    y=38;
     for(let i=0;i<filtered.length;i++){
       const p=filtered[i];
       if(y>255){doc.addPage();y=18;}
-      doc.setFillColor(245,166,35);doc.rect(M,y,CW,8,'F');
-      doc.setTextColor(0,0,0);doc.setFontSize(11);doc.setFont('helvetica','bold');
-      doc.text(`${i+1}.  ${p.poleId}  —  ${p.type}${p.model?' — '+p.model:''}`,M+3,y+5.5);y+=12;
-      doc.setTextColor(40,40,40);doc.setFontSize(9);doc.setFont('helvetica','normal');
-      [`Técnico: ${p.tech||'N/A'}`,`GPS: ${p.lat}, ${p.lng}`,`Data: ${p.date}`,`Fotos: ${p.hasPhotos||0}`,p.obs?`Obs: ${p.obs}`:null].filter(Boolean).forEach(l=>{doc.text(l,M,y);y+=5;});
-      doc.setDrawColor(230,230,230);doc.line(M,y+3,M+CW,y+3);y+=10;
+      doc.setFillColor(245,166,35);doc.rect(M,y,CW,7,'F');
+      doc.setTextColor(0);doc.setFontSize(10);doc.setFont('helvetica','bold');
+      doc.text(`${i+1}. ${p.poleId} — ${p.type}${p.model?' — '+p.model:''}`,M+2,y+5);y+=10;
+      doc.setTextColor(40);doc.setFontSize(8);doc.setFont('helvetica','normal');
+      [`Técnico: ${p.tech||'N/A'}`,`GPS: ${p.lat}, ${p.lng}`,`Data: ${p.date}`,p.obs?`Obs: ${p.obs}`:null,`Fotos: ${p.hasPhotos||0}`].filter(Boolean).forEach(l=>{doc.text(l,M,y);y+=4.5;});
+      doc.setDrawColor(220);doc.line(M,y+2,M+CW,y+2);y+=7;
     }
-    doc.save(`relatorio-supervisor-${new Date().toISOString().slice(0,10)}.pdf`);
+    doc.save('supervisor-'+new Date().toISOString().slice(0,10)+'.pdf');
     toast('✅ PDF gerado!','ok');
   }catch(e){toast('❌ Erro PDF','er');}
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+let tt;
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast '+type+' show';
+  clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3000);
 }
 
 init();
