@@ -174,7 +174,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
 .bin-setup{
   position:fixed;inset:0;background:rgba(0,0,0,.92);
   backdrop-filter:blur(8px);z-index:500;
-  display:flex;align-items:center;justify-content:center;padding:20px;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.bin-setup.open{
+  display:flex;
 }
 .bin-box{
   background:var(--sf);border:1px solid var(--bd);border-radius:20px;
@@ -267,7 +270,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-ser
 <body>
 
 <!-- BIN SETUP -->
-<div class="bin-setup" id="binSetup">
+<div class="bin-setup" id="binSetup" style="display:none">
   <div class="bin-box">
     <div class="logo-big">🔆</div>
     <h2>PosteGPS <span>Supervisor</span></h2>
@@ -423,8 +426,10 @@ function saveBin(){
   loadData();
 }
 function changeBin(){
-  document.getElementById('binInput').value=currentBin||'';
+  document.getElementById('binInput').value=currentBin||FIXED_BIN_ID;
   document.getElementById('binSetup').style.display='flex';
+  document.getElementById('binSetup').style.alignItems='center';
+  document.getElementById('binSetup').style.justifyContent='center';
 }
 
 // ── LOAD DATA ─────────────────────────────────────────────────────────
