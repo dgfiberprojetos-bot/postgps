@@ -206,8 +206,8 @@ function parseCSV(text){
     const cols = splitCSVLine(line);
     const obj = {};
     hdrs.forEach((h,i)=>{ obj[h.trim()] = (cols[i]||'').trim(); });
-    obj.lat = parseFloat(obj.lat)||0;
-    obj.lng = parseFloat(obj.lng)||0;
+    obj.lat = parseFloat((obj.lat||"0").replace(",","."))||0;
+    obj.lng = parseFloat((obj.lng||"0").replace(",","."))||0;
     obj.hasPhotos = parseInt(obj.hasPhotos)||0;
     try{ obj.history = obj.history ? JSON.parse(obj.history) : []; }catch(e){ obj.history=[]; }
     return obj;
