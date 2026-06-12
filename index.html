@@ -456,6 +456,7 @@ async function pushToCloud() {
       obs: p.obs || '',
       hasPhotos: (p.photos || []).filter(Boolean).length || (p.photo_urls || []).filter(Boolean).length,
       photo_urls: p.photo_urls || [],
+      photos_data: (p.photos || []).map(ph => ph ? {data: ph.data, name: ph.name || 'foto.jpg'} : null),
       history: p.history || []
     }));
     const resp = await fetch(SUPABASE_URL + '/rest/v1/postes?on_conflict=poleId', {
@@ -831,13 +832,11 @@ async function addPole(){
     if(localPhotos.some(Boolean)) ex.photos=localPhotos;
     save();renderList();clearDraftS();resetForm();
     scheduleSync();
-    savePhotosToRow(poleId, localPhotos).catch(e=>console.warn('savePhotos',e));
     toast(`🔄 Nova visita: ${poleId}!`,'ok');goTab('lista');return;
   }
   poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:localPhotos,photo_urls:photoUrls,date:new Date().toLocaleString('pt-BR'),history:[]});
   save();renderList();clearDraftS();resetForm();
   scheduleSync();
-  savePhotosToRow(poleId, localPhotos).catch(e=>console.warn('savePhotos',e));
   toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
 }
 
