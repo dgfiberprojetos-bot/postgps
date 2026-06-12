@@ -431,6 +431,17 @@ async function uploadPhotoToStorage(base64data, filename) {
   return `${SUPABASE_URL}/storage/v1/object/public/poste-fotos/${filename}`;
 }
 
+async function savePhotosToRow(poleId, photos) {
+  if(!navigator.onLine) return;
+  const photos_data = (photos||[]).map(ph => ph ? {data: ph.data, name: ph.name||'foto.jpg'} : null);
+  if(!photos_data.some(Boolean)) return;
+  await fetch(`${SUPABASE_URL}/rest/v1/postes?poleId=eq.${encodeURIComponent(poleId)}`, {
+    method: 'PATCH',
+    headers: {...sbH(), 'Prefer': 'return=minimal'},
+    body: JSON.stringify({photos_data})
+  });
+}
+
 async function pushToCloud() {
   if(!navigator.onLine) return;
   try {
@@ -482,7 +493,7 @@ async function pullFromCloud() {
           tech: row.tech || '',
           date: row.date || '',
           obs: row.obs || '',
-          photos: [null, null],
+          photos: Array.isArray(row.photos_data) && row.photos_data.some(Boolean) ? row.photos_data.map(ph=>ph||null) : [null,null],
           photo_urls: Array.isArray(row.photo_urls) ? row.photo_urls : [],
           history: Array.isArray(row.history) ? row.history : []
         });
@@ -835,18 +846,22 @@ async function addPole(){
     photoUrls = await Promise.all(uploads);
   }
 
+  const localPhotos = [pd[1]?{...pd[1]}:null, pd[2]?{...pd[2]}:null];
   const ex=poles.find(p=>p.poleId===poleId);
   if(ex){
     if(!ex.history)ex.history=[];
-    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],photo_urls:photoUrls,lat,lng});
+    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:localPhotos,photo_urls:photoUrls,lat,lng});
     ex.lat=lat;ex.lng=lng;
+    if(localPhotos.some(Boolean)) ex.photos=localPhotos;
     save();renderList();clearDraftS();resetForm();
     scheduleSync();
+    savePhotosToRow(poleId, localPhotos).catch(e=>console.warn('savePhotos',e));
     toast(`🔄 Nova visita: ${poleId}!`,'ok');goTab('lista');return;
   }
-  poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],photo_urls:photoUrls,date:new Date().toLocaleString('pt-BR'),history:[]});
+  poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:localPhotos,photo_urls:photoUrls,date:new Date().toLocaleString('pt-BR'),history:[]});
   save();renderList();clearDraftS();resetForm();
   scheduleSync();
+  savePhotosToRow(poleId, localPhotos).catch(e=>console.warn('savePhotos',e));
   toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
 }
 

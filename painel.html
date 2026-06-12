@@ -194,6 +194,7 @@ async function loadData(){
         lng: parseFloat(p.lng),
         hasPhotos: parseInt(p.hasPhotos)||0,
         photo_urls: Array.isArray(p.photo_urls) ? p.photo_urls.filter(Boolean) : [],
+        photos_data: Array.isArray(p.photos_data) ? p.photos_data.filter(Boolean) : [],
         history: Array.isArray(p.history) ? p.history : []
       }));
     dot.className='sdot ok';
@@ -275,7 +276,8 @@ function renderMap(){
       html:`<div style="width:32px;height:32px;background:${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:11px;font-weight:800;color:#000">${i+1}</span></div>`,
       className:'',iconSize:[32,32],iconAnchor:[16,32]
     });
-    const photoHtml=(p.photo_urls||[]).map(u=>`<img src="${u}" style="width:100%;border-radius:6px;margin-top:4px;object-fit:cover;max-height:110px;cursor:pointer" onclick="window.open('${u}','_blank')">`).join('');
+    const photoSrcs=[...(p.photos_data||[]).map(ph=>ph&&ph.data?ph.data:null),(p.photo_urls||[])].flat().filter(Boolean);
+    const photoHtml=photoSrcs.map(src=>`<img src="${src}" style="width:100%;border-radius:6px;margin-top:4px;object-fit:cover;max-height:110px;cursor:pointer" onclick="window.open('${src}','_blank')">`).join('');
     const popup = `<div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.8;min-width:200px;max-width:240px">
       <div style="font-size:15px;font-weight:700;margin-bottom:6px">Poste ${p.poleId}</div>
       <div><b>Tipo:</b> ${p.type}${p.model?' — '+p.model:''}</div>
@@ -379,30 +381,54 @@ function expKML(){
 async function expKMZ(){
   if(!filtered.length){toast('Nenhum poste','info');return;}
   if(typeof JSZip==='undefined'){toast('Aguarde...','info');setTimeout(expKMZ,1000);return;}
-  toast('📦 Baixando fotos e gerando KMZ...','info');
+  toast('📦 Gerando KMZ com fotos...','info');
   const zip=new JSZip();
   const filesFolder=zip.folder('files');
   const photoFileMap={};
-  // Download each unique photo URL and embed in the ZIP
+  let totalFotos=0;
   for(const p of filtered){
-    const urls=(p.photo_urls||[]).filter(Boolean);
-    for(let i=0;i<urls.length;i++){
-      const url=urls[i];
-      if(photoFileMap[url])continue;
-      const safeId=p.poleId.replace(/[^\w-]/g,'_');
+    const safeId=p.poleId.replace(/[^\w-]/g,'_');
+    // Embed from photos_data (base64 stored in DB) — most reliable
+    const localPhotos=(p.photos_data||[]);
+    for(let i=0;i<localPhotos.length;i++){
+      const ph=localPhotos[i];
+      if(!ph||!ph.data)continue;
       const fname=`${safeId}_foto${i+1}.jpg`;
-      photoFileMap[url]=fname;
-      try{
-        const r=await fetch(url);
-        if(r.ok){const ab=await r.arrayBuffer();filesFolder.file(fname,ab);}
-      }catch(e){console.warn('Foto não baixada:',url);}
+      const b64=ph.data.split(',')[1]||ph.data;
+      filesFolder.file(fname,b64,{base64:true});
+      photoFileMap[`__local__${p.poleId}_${i}`]=fname;
+      totalFotos++;
+    }
+    // Fallback: fetch from Storage URL if no local data
+    if(!localPhotos.some(Boolean)){
+      const urls=(p.photo_urls||[]).filter(Boolean);
+      for(let i=0;i<urls.length;i++){
+        const fname=`${safeId}_foto${i+1}.jpg`;
+        try{
+          const r=await fetch(urls[i]);
+          if(r.ok){filesFolder.file(fname,await r.arrayBuffer());photoFileMap[`__local__${p.poleId}_${i}`]=fname;totalFotos++;}
+        }catch(e){}
+      }
     }
   }
-  zip.file('doc.kml',buildKML(photoFileMap));
+  zip.file('doc.kml',buildKMLEmbed(photoFileMap));
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
   dlBlob(blob,'postes.kmz');
-  const total=Object.keys(photoFileMap).length;
-  toast(`✅ KMZ exportado com ${total} foto(s)!`,'ok');
+  toast(`✅ KMZ com ${totalFotos} foto(s) exportado!`,'ok');
+}
+
+function buildKMLEmbed(photoFileMap){
+  const ps=filtered.map(p=>{
+    const safeId=p.poleId.replace(/[^\w-]/g,'_');
+    const localPhotos=(p.photos_data||[]);
+    const ph=localPhotos.map((x,i)=>{
+      const key=`__local__${p.poleId}_${i}`;
+      const fname=photoFileMap[key];
+      return fname?`<img src="files/${fname}" width="400"/><br/>`:'';
+    }).join('');
+    return`<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}${p.obs?'<br/><b>Obs:</b>'+p.obs:''}${ph?'<br/>'+ph:''}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+  }).join('');
+  return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>PosteGPS Supervisor</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
 }
 
 function expCSV(){
