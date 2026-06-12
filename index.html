@@ -513,46 +513,22 @@ function scheduleSync() {
   syncTimer = setTimeout(() => { pushToCloud(); }, 2000);
 }
 
-// Migração: sobe fotos antigas que ainda estão no celular mas nunca foram para o Supabase
+// Migração: salva fotos antigas que estão no celular direto no banco
 async function migrateOldPhotos() {
   if(!navigator.onLine) return;
-  if(localStorage.getItem('pgps_migrated_v3')) return; // já rodou
-  const pending = poles.filter(p => {
-    const hasLocal = (p.photos||[]).some(Boolean);
-    const hasCloud = (p.photo_urls||[]).some(Boolean);
-    return hasLocal && !hasCloud;
-  });
-  if(!pending.length){ localStorage.setItem('pgps_migrated_v1','1'); return; }
-  toast(`📤 Migrando fotos de ${pending.length} poste(s)...`,'info');
+  if(localStorage.getItem('pgps_migrated_v4')) return;
+  const pending = poles.filter(p => (p.photos||[]).some(Boolean));
+  if(!pending.length){ localStorage.setItem('pgps_migrated_v4','1'); return; }
+  toast(`📤 Salvando fotos de ${pending.length} poste(s) na nuvem...`,'info');
   let ok = 0;
   for(const p of pending){
-    const safeId = p.poleId.replace(/[^\w-]/g,'_');
-    const urls = [null, null];
-    for(let n = 0; n < 2; n++){
-      const ph = p.photos[n];
-      if(!ph) continue;
-      try{
-        const fname = `${safeId}_foto${n+1}_${Date.now()}.jpg`;
-        urls[n] = await uploadPhotoToStorage(ph.data, fname);
-      }catch(e){
-        const msg = e.message||String(e);
-        toast(`❌ Erro upload foto: ${msg.slice(0,80)}`,'er');
-        console.error('migrate foto',n,e);
-      }
-    }
-    if(urls.some(Boolean)){
-      p.photo_urls = urls;
+    try{
+      await savePhotosToRow(p.poleId, p.photos);
       ok++;
-    }
+    }catch(e){ console.warn('migrate',p.poleId,e); }
   }
-  if(ok > 0){
-    save();
-    await pushToCloud();
-    toast(`✅ ${ok} poste(s) com fotos migrados para a nuvem!`,'ok');
-  } else if(pending.length > 0){
-    toast('⚠️ Upload falhou — veja o erro acima','er');
-  }
-  localStorage.setItem('pgps_migrated_v3','1');
+  if(ok > 0) toast(`✅ ${ok} poste(s) com fotos salvos na nuvem!`,'ok');
+  localStorage.setItem('pgps_migrated_v4','1');
 }
 
 function copyBinId() {
