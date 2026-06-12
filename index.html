@@ -505,7 +505,7 @@ function scheduleSync() {
 // Migração: sobe fotos antigas que ainda estão no celular mas nunca foram para o Supabase
 async function migrateOldPhotos() {
   if(!navigator.onLine) return;
-  if(localStorage.getItem('pgps_migrated_v2')) return; // já rodou
+  if(localStorage.getItem('pgps_migrated_v3')) return; // já rodou
   const pending = poles.filter(p => {
     const hasLocal = (p.photos||[]).some(Boolean);
     const hasCloud = (p.photo_urls||[]).some(Boolean);
@@ -523,7 +523,11 @@ async function migrateOldPhotos() {
       try{
         const fname = `${safeId}_foto${n+1}_${Date.now()}.jpg`;
         urls[n] = await uploadPhotoToStorage(ph.data, fname);
-      }catch(e){ console.warn('migrate foto',n,e); }
+      }catch(e){
+        const msg = e.message||String(e);
+        toast(`❌ Erro upload foto: ${msg.slice(0,80)}`,'er');
+        console.error('migrate foto',n,e);
+      }
     }
     if(urls.some(Boolean)){
       p.photo_urls = urls;
@@ -534,8 +538,10 @@ async function migrateOldPhotos() {
     save();
     await pushToCloud();
     toast(`✅ ${ok} poste(s) com fotos migrados para a nuvem!`,'ok');
+  } else if(pending.length > 0){
+    toast('⚠️ Upload falhou — veja o erro acima','er');
   }
-  localStorage.setItem('pgps_migrated_v2','1');
+  localStorage.setItem('pgps_migrated_v3','1');
 }
 
 function copyBinId() {
