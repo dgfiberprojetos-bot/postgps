@@ -958,43 +958,30 @@ function delById(id){
 }
 
 // KML/KMZ/PDF
-function buildKML(fk){
+function buildKML(inline){
   const ps=poles.map(p=>{
-    // Use embedded local files if KMZ mode, else use cloud URLs, else nothing
-    let ph='';
-    if(fk){
-      const localPh=p.photos.map((x,i)=>{if(!x)return'';const fn=`files/foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`;return`<img src="${fn}" width="300"/><br/>`;}).join('');
-      const urlPh=(p.photo_urls||[]).map((u,i)=>{if(!u||p.photos[i])return'';return`<img src="${u}" width="300"/><br/>`;}).join('');
-      ph=localPh+urlPh;
-    }
-    return`<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Modelo:</b>${p.model||'N/A'}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}<br/>${p.obs?`<b>Obs:</b>${p.obs}<br/>`:''}${ph}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+    // inline=true: embed fotos como base64 direto no KML (funciona no Google Earth)
+    const ph=(p.photos||[]).map(x=>{
+      if(!x||!x.data)return'';
+      return`<img src="${x.data}" width="350"><br>`;
+    }).join('');
+    return`<Placemark><name>${p.poleId}</name><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b> ${p.type}<br><b>Modelo:</b> ${p.model||'N/A'}<br><b>Técnico:</b> ${p.tech||'N/A'}<br><b>Data:</b> ${p.date}<br>${p.obs?`<b>Obs:</b> ${p.obs}<br>`:''}${ph}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
   }).join('');
-  return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>Postes</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
+  return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Postes</name><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
 }
-function exportKML(){if(!poles.length){toast('⚠️ Nenhum poste','er');return;}dl(new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'}),'postes.kml');toast('📄 KML exportado!','ok');}
+function exportKML(){if(!poles.length){toast('⚠️ Nenhum poste','er');return;}dl(new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'}),'postes.kml');toast('📄 KML exportado!','ok');}
 async function exportKMZ(){
   if(!poles.length){toast('⚠️ Nenhum poste','er');return;}
   if(typeof JSZip==='undefined'){toast('Carregando...','info');setTimeout(exportKMZ,1000);return;}
   toast('📦 Gerando KMZ...','info');
   try{
-    const zip=new JSZip();zip.file('doc.kml',buildKML(true));
-    const f=zip.folder('files');
-    // Embed local photos (base64)
-    poles.forEach(p=>p.photos.forEach((ph,i)=>{if(!ph)return;f.file(`foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`,ph.data.split(',')[1],{base64:true});}));
-    // Fetch and embed cloud photos where local is missing
-    for(const p of poles){
-      const urls=p.photo_urls||[];
-      for(let i=0;i<urls.length;i++){
-        if(!urls[i]||p.photos[i])continue;
-        try{
-          const r=await fetch(urls[i]);
-          if(r.ok){const ab=await r.arrayBuffer();f.file(`foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`,ab);}
-        }catch(e){}
-      }
-    }
+    const zip=new JSZip();
+    // Fotos embutidas direto no KML como base64 — funciona garantido no Google Earth
+    zip.file('doc.kml',buildKML(true));
     const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+    const total=poles.reduce((s,p)=>s+(p.photos||[]).filter(Boolean).length,0);
     dl(blob,'postes.kmz');
-    toast(`✅ KMZ: ${poles.length} postes`,'ok');
+    toast(`✅ KMZ: ${poles.length} postes, ${total} foto(s)!`,'ok');
   }catch(e){toast('❌ Erro KMZ','er');}
 }
 async function exportPDF(){
