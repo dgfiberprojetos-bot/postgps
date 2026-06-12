@@ -505,7 +505,7 @@ function scheduleSync() {
 // Migração: sobe fotos antigas que ainda estão no celular mas nunca foram para o Supabase
 async function migrateOldPhotos() {
   if(!navigator.onLine) return;
-  if(localStorage.getItem('pgps_migrated_v1')) return; // já rodou
+  if(localStorage.getItem('pgps_migrated_v2')) return; // já rodou
   const pending = poles.filter(p => {
     const hasLocal = (p.photos||[]).some(Boolean);
     const hasCloud = (p.photo_urls||[]).some(Boolean);
@@ -535,7 +535,7 @@ async function migrateOldPhotos() {
     await pushToCloud();
     toast(`✅ ${ok} poste(s) com fotos migrados para a nuvem!`,'ok');
   }
-  localStorage.setItem('pgps_migrated_v1','1');
+  localStorage.setItem('pgps_migrated_v2','1');
 }
 
 function copyBinId() {
