@@ -852,17 +852,11 @@ function resetForm(){ clearDraftS();
 }
 
 // LIST
-let listPage=0;
-const PAGE_SIZE=20;
-function renderList(page){
-  page = page||0; listPage=page;
+function renderList(){
   const list=document.getElementById('pList');
   document.getElementById('cntBadge').textContent=poles.length;
   if(!poles.length){list.innerHTML='<div class="empty"><div class="ei">🔆</div><p>Nenhum poste.<br>Toque em "Novo" para começar.</p></div>';return;}
-  const start=listPage*PAGE_SIZE;
-  const pagePoles=poles.slice(start,start+PAGE_SIZE);
-  list.innerHTML=pagePoles.map((p,i)=>{
-  const globalI=start+i;
+  list.innerHTML=poles.map((p,i)=>{
     const th=p.photos.filter(Boolean).map(ph=>`<img class="pthumb" src="${ph.data}">`).join('');
     const v=(p.history||[]).length;
     return `<div class="pi" onclick="viewPole(${p.id})">
