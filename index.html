@@ -318,7 +318,7 @@ input[type=file]{display:none}
   <div style="margin-bottom:12px;padding:12px 14px;background:var(--sf);border:1px solid var(--bd);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:11px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <span id="syncStatus" style="color:var(--mu)">☁️ Aguardando sincronização...</span>
-      <button onclick="pullFromCloud();pushToCloud();toast('🔄 Sincronizando...','info')" style="background:var(--ac);border:none;border-radius:6px;color:#000;font-family:'Inter',sans-serif;font-weight:700;font-size:11px;padding:5px 10px;cursor:pointer">Sincronizar</button>
+      <button onclick="toast('🔄 Sincronizando...','info');pullFromCloud().then(()=>{migrateOldPhotos();pushToCloud();})" style="background:var(--ac);border:none;border-radius:6px;color:#000;font-family:'Inter',sans-serif;font-weight:700;font-size:11px;padding:5px 10px;cursor:pointer">Sincronizar</button>
     </div>
     <div style="color:var(--mu);font-size:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">ID para o painel supervisor:</div>
     <div style="display:flex;gap:6px;align-items:center">
@@ -502,6 +502,42 @@ function scheduleSync() {
   syncTimer = setTimeout(() => { pushToCloud(); }, 2000);
 }
 
+// Migração: sobe fotos antigas que ainda estão no celular mas nunca foram para o Supabase
+async function migrateOldPhotos() {
+  if(!navigator.onLine) return;
+  if(localStorage.getItem('pgps_migrated_v1')) return; // já rodou
+  const pending = poles.filter(p => {
+    const hasLocal = (p.photos||[]).some(Boolean);
+    const hasCloud = (p.photo_urls||[]).some(Boolean);
+    return hasLocal && !hasCloud;
+  });
+  if(!pending.length){ localStorage.setItem('pgps_migrated_v1','1'); return; }
+  toast(`📤 Migrando fotos de ${pending.length} poste(s)...`,'info');
+  let ok = 0;
+  for(const p of pending){
+    const safeId = p.poleId.replace(/[^\w-]/g,'_');
+    const urls = [null, null];
+    for(let n = 0; n < 2; n++){
+      const ph = p.photos[n];
+      if(!ph) continue;
+      try{
+        const fname = `${safeId}_foto${n+1}_${Date.now()}.jpg`;
+        urls[n] = await uploadPhotoToStorage(ph.data, fname);
+      }catch(e){ console.warn('migrate foto',n,e); }
+    }
+    if(urls.some(Boolean)){
+      p.photo_urls = urls;
+      ok++;
+    }
+  }
+  if(ok > 0){
+    save();
+    await pushToCloud();
+    toast(`✅ ${ok} poste(s) com fotos migrados para a nuvem!`,'ok');
+  }
+  localStorage.setItem('pgps_migrated_v1','1');
+}
+
 function copyBinId() {
   const txt = SUPABASE_URL + '/rest/v1/postes';
   navigator.clipboard.writeText(txt).then(() => toast('📋 URL copiada!','ok')).catch(() => {
@@ -553,7 +589,7 @@ function init(){
     if(!sa&&!localStorage.getItem('pwa_closed'))
       document.getElementById('banPwa').classList.add('on');
   }catch(e){}
-  pullFromCloud();
+  pullFromCloud().then(()=>migrateOldPhotos());
   window.addEventListener('offline',()=>document.getElementById('banOff').classList.add('on'));
   window.addEventListener('online',()=>document.getElementById('banOff').classList.remove('on'));
   if(!navigator.onLine) document.getElementById('banOff').classList.add('on');
