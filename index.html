@@ -517,9 +517,9 @@ function scheduleSync() {
 // Migração: salva fotos antigas que estão no celular direto no banco
 async function migrateOldPhotos() {
   if(!navigator.onLine) return;
-  if(localStorage.getItem('pgps_migrated_v4')) return;
+  if(localStorage.getItem('pgps_migrated_v5')) return;
   const pending = poles.filter(p => (p.photos||[]).some(Boolean));
-  if(!pending.length){ localStorage.setItem('pgps_migrated_v4','1'); return; }
+  if(!pending.length){ localStorage.setItem('pgps_migrated_v5','1'); return; }
   toast(`📤 Salvando fotos de ${pending.length} poste(s) na nuvem...`,'info');
   let ok = 0;
   for(const p of pending){
@@ -529,7 +529,7 @@ async function migrateOldPhotos() {
     }catch(e){ console.warn('migrate',p.poleId,e); }
   }
   if(ok > 0) toast(`✅ ${ok} poste(s) com fotos salvos na nuvem!`,'ok');
-  localStorage.setItem('pgps_migrated_v4','1');
+  localStorage.setItem('pgps_migrated_v5','1');
 }
 
 function copyBinId() {
