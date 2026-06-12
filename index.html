@@ -411,6 +411,26 @@ function sbH(){
   };
 }
 
+async function uploadPhotoToStorage(base64data, filename) {
+  const base64 = base64data.split(',')[1];
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for(let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  const blob = new Blob([arr], {type: 'image/jpeg'});
+  const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/poste-fotos/${filename}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true'
+    },
+    body: blob
+  });
+  if(!resp.ok) throw new Error(await resp.text());
+  return `${SUPABASE_URL}/storage/v1/object/public/poste-fotos/${filename}`;
+}
+
 async function pushToCloud() {
   if(!navigator.onLine) return;
   try {
@@ -423,7 +443,8 @@ async function pushToCloud() {
       tech: p.tech || '',
       date: p.date || '',
       obs: p.obs || '',
-      hasPhotos: (p.photos || []).filter(Boolean).length,
+      hasPhotos: (p.photos || []).filter(Boolean).length || (p.photo_urls || []).filter(Boolean).length,
+      photo_urls: p.photo_urls || [],
       history: p.history || []
     }));
     const resp = await fetch(SUPABASE_URL + '/rest/v1/postes?on_conflict=poleId', {
@@ -462,6 +483,7 @@ async function pullFromCloud() {
           date: row.date || '',
           obs: row.obs || '',
           photos: [null, null],
+          photo_urls: Array.isArray(row.photo_urls) ? row.photo_urls : [],
           history: Array.isArray(row.history) ? row.history : []
         });
         added++;
@@ -750,19 +772,37 @@ function updatePP(){
 }
 
 // ADD POLE
-function addPole(){
+async function addPole(){
   const poleId=V('poleId').trim(),type=V('poleType'),model=V('poleModel'),lat=parseFloat(V('lat')),lng=parseFloat(V('lng')),obs=V('poleObs').trim();
   if(!poleId){toast('⚠️ Informe o ID do poste','er');return;}
   if(isNaN(lat)||isNaN(lng)){toast('⚠️ Capture a localização GPS primeiro','er');return;}
+
+  // Upload photos to Supabase Storage
+  let photoUrls = [null, null];
+  const hasLocalPhotos = pd[1] || pd[2];
+  if(hasLocalPhotos && navigator.onLine){
+    toast('📤 Enviando fotos...','info');
+    const safeId = poleId.replace(/[^\w-]/g,'_');
+    const uploads = [1,2].map(async n => {
+      if(!pd[n]) return null;
+      try{
+        const fname = `${safeId}_foto${n}_${Date.now()}.jpg`;
+        return await uploadPhotoToStorage(pd[n].data, fname);
+      }catch(e){ console.warn('upload foto',n,e); return null; }
+    });
+    photoUrls = await Promise.all(uploads);
+  }
+
   const ex=poles.find(p=>p.poleId===poleId);
   if(ex){
     if(!ex.history)ex.history=[];
-    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],lat,lng});
+    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],photo_urls:photoUrls,lat,lng});
     ex.lat=lat;ex.lng=lng;
     save();renderList();clearDraftS();resetForm();
+    scheduleSync();
     toast(`🔄 Nova visita: ${poleId}!`,'ok');goTab('lista');return;
   }
-  poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],date:new Date().toLocaleString('pt-BR'),history:[]});
+  poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:[pd[1]?{...pd[1]}:null,pd[2]?{...pd[2]}:null],photo_urls:photoUrls,date:new Date().toLocaleString('pt-BR'),history:[]});
   save();renderList();clearDraftS();resetForm();
   scheduleSync();
   toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
@@ -886,7 +926,16 @@ function delById(id){
 
 // KML/KMZ/PDF
 function buildKML(fk){
-  const ps=poles.map(p=>{const ph=p.photos.map((x,i)=>{if(!x)return'';const fn=`files/foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`;return fk?`<img src="${fn}" width="300"/><br/>`:''}).join('');return`<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Modelo:</b>${p.model||'N/A'}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}<br/>${p.obs?`<b>Obs:</b>${p.obs}<br/>`:''}${ph}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;}).join('');
+  const ps=poles.map(p=>{
+    // Use embedded local files if KMZ mode, else use cloud URLs, else nothing
+    let ph='';
+    if(fk){
+      const localPh=p.photos.map((x,i)=>{if(!x)return'';const fn=`files/foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`;return`<img src="${fn}" width="300"/><br/>`;}).join('');
+      const urlPh=(p.photo_urls||[]).map((u,i)=>{if(!u||p.photos[i])return'';return`<img src="${u}" width="300"/><br/>`;}).join('');
+      ph=localPh+urlPh;
+    }
+    return`<Placemark><n>${p.poleId}</n><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b>${p.type}<br/><b>Modelo:</b>${p.model||'N/A'}<br/><b>Técnico:</b>${p.tech||'N/A'}<br/><b>Data:</b>${p.date}<br/>${p.obs?`<b>Obs:</b>${p.obs}<br/>`:''}${ph}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+  }).join('');
   return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>Postes</n><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
 }
 function exportKML(){if(!poles.length){toast('⚠️ Nenhum poste','er');return;}dl(new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'}),'postes.kml');toast('📄 KML exportado!','ok');}
@@ -897,7 +946,19 @@ async function exportKMZ(){
   try{
     const zip=new JSZip();zip.file('doc.kml',buildKML(true));
     const f=zip.folder('files');
+    // Embed local photos (base64)
     poles.forEach(p=>p.photos.forEach((ph,i)=>{if(!ph)return;f.file(`foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`,ph.data.split(',')[1],{base64:true});}));
+    // Fetch and embed cloud photos where local is missing
+    for(const p of poles){
+      const urls=p.photo_urls||[];
+      for(let i=0;i<urls.length;i++){
+        if(!urls[i]||p.photos[i])continue;
+        try{
+          const r=await fetch(urls[i]);
+          if(r.ok){const ab=await r.arrayBuffer();f.file(`foto_${p.poleId.replace(/\W/g,'_')}_${i+1}.jpg`,ab);}
+        }catch(e){}
+      }
+    }
     const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
     dl(blob,'postes.kmz');
     toast(`✅ KMZ: ${poles.length} postes`,'ok');
