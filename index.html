@@ -460,7 +460,9 @@ function docIdFor(p){
 function newUid(){ return 'pg-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
 
 function toCloud(p){
-  const fotos = (p.photos || []).map(ph => ph && ph.data ? ph.data : null);
+  let fotos = (p.photos || []).map(ph => ph && ph.data ? ph.data : null);
+  // nunca apagar no sistema fotos que este celular não tem carregadas
+  if(!fotos.some(Boolean) && Array.isArray(p.fotos_b64)) fotos = p.fotos_b64.filter(Boolean);
   return {
     uid: p.uid,
     poleId: p.poleId,
@@ -602,10 +604,19 @@ function init(){
   try{
     const s=localStorage.getItem('pgps4');
     if(s) poles=JSON.parse(s);
-    // Migração: postes sem uid (versão Supabase) ganham uid e são reenviados ao sistema
+    // Migração das versões anteriores (Supabase e campo.dgfiberprojetos v4.1):
+    // garante uid, recupera fotos que só estavam em fotos_b64 e reenvia tudo uma vez
+    const v5=!localStorage.getItem('pgps_v5');
     let mig=false;
-    poles.forEach(p=>{ if(!p.uid){ p.uid=docIdFor(p); p._dirty=true; mig=true; } });
+    poles.forEach(p=>{
+      if(!Array.isArray(p.photos)) p.photos=[null,null];
+      const fb=Array.isArray(p.fotos_b64)?p.fotos_b64.filter(Boolean):[];
+      if(!p.photos.some(Boolean) && fb.length){ p.photos=[0,1].map(i=>fb[i]?{data:fb[i],name:`foto${i+1}.jpg`,type:'image/jpeg'}:null); mig=true; }
+      if(!p.uid){ p.uid=docIdFor(p); p._dirty=true; mig=true; }
+      if(v5){ p._dirty=true; mig=true; }
+    });
     if(mig) save();
+    localStorage.setItem('pgps_v5','1');
     tech=localStorage.getItem('pgps_tech')||'';
     if(tech) document.getElementById('techDisp').textContent=tech;
     loadDraft();
