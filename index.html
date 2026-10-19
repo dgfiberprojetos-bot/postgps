@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- PosteGPS v4.1 - 2026-04-24 -->
+<!-- PosteGPS v5.0 - 2026-10-19 - sincroniza com o Firestore do sistema DGFIBER -->
 <title>PosteGPS</title>
 
 <!-- Preload libs so they get cached on first visit -->
@@ -179,6 +179,15 @@ input[type=file]{display:none}
 .tmod h3{font-size:18px;font-weight:800;margin-bottom:16px}
 .tinp{width:100%;background:var(--sf2);border:1.5px solid var(--ac);border-radius:10px;color:var(--tx);font-family:'JetBrains Mono','Courier New',monospace;font-size:16px;padding:14px;outline:none;margin-bottom:12px;min-height:var(--tap)}
 .tsave{width:100%;background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:12px;color:#000;font-family:'Inter',sans-serif;font-weight:800;font-size:16px;padding:15px;cursor:pointer;min-height:var(--tap);touch-action:manipulation}
+/* LOGIN */
+.lov{position:fixed;inset:0;background:var(--bg);z-index:400;display:none;align-items:center;justify-content:center;padding:16px}
+.lov.on{display:flex}
+.lbox{width:100%;max-width:400px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:24px 18px}
+.lbox h2{font-size:28px;font-weight:800;letter-spacing:-.8px;margin-bottom:8px}
+.lbox h2 span{color:var(--ac)}
+.lbox p{font-size:13px;color:var(--mu);line-height:1.5;margin-bottom:16px}
+.lbox .tsave:disabled{opacity:.6}
+.lskip{width:100%;background:none;border:none;color:var(--mu);font-size:12px;padding:14px;margin-top:6px;cursor:pointer;text-decoration:underline}
 /* TOAST */
 .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--sf);border:1px solid var(--bd);border-radius:30px;padding:11px 22px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:500;white-space:nowrap;max-width:90vw}
 .toast.show{transform:translateX(-50%) translateY(0)}
@@ -318,12 +327,12 @@ input[type=file]{display:none}
   <div style="margin-bottom:12px;padding:12px 14px;background:var(--sf);border:1px solid var(--bd);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:11px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <span id="syncStatus" style="color:var(--mu)">☁️ Aguardando sincronização...</span>
-      <button onclick="toast('🔄 Sincronizando...','info');pullFromCloud().then(()=>{migrateOldPhotos();pushToCloud();})" style="background:var(--ac);border:none;border-radius:6px;color:#000;font-family:'Inter',sans-serif;font-weight:700;font-size:11px;padding:5px 10px;cursor:pointer">Sincronizar</button>
+      <button onclick="toast('🔄 Sincronizando...','info');pushToCloud()" style="background:var(--ac);border:none;border-radius:6px;color:#000;font-family:'Inter',sans-serif;font-weight:700;font-size:11px;padding:5px 10px;cursor:pointer">Sincronizar</button>
     </div>
-    <div style="color:var(--mu);font-size:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">ID para o painel supervisor:</div>
+    <div style="color:var(--mu);font-size:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">Conta no sistema DGFIBER:</div>
     <div style="display:flex;gap:6px;align-items:center">
-      <div id="binIdDisp" style="flex:1;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--ac);font-size:11px;word-break:break-all">Aguardando primeiro sync...</div>
-      <button onclick="copyBinId()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:18px;padding:6px 10px;cursor:pointer;flex-shrink:0">📋</button>
+      <div id="binIdDisp" style="flex:1;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--ac);font-size:11px;word-break:break-all">Conectando...</div>
+      <button id="btnConta" onclick="toggleConta()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-family:'Inter',sans-serif;font-weight:700;font-size:11px;padding:8px 12px;cursor:pointer;flex-shrink:0">Entrar</button>
     </div>
   </div>
   <div class="sgrid">
@@ -387,6 +396,18 @@ input[type=file]{display:none}
   </div>
 </div>
 
+<!-- LOGIN (conta do sistema DGFIBER) -->
+<div class="lov" id="lov">
+  <div class="lbox">
+    <h2>Poste<span>GPS</span></h2>
+    <p>Entre com sua conta do sistema DGFIBER para enviar os postes ao projeto.</p>
+    <input class="tinp" id="lEmail" type="email" placeholder="E-mail" autocomplete="username">
+    <input class="tinp" id="lSenha" type="password" placeholder="Senha" autocomplete="current-password">
+    <button class="tsave" id="btnLogin" onclick="doLogin()">Entrar</button>
+    <button class="lskip" onclick="skipLogin()">Continuar sem login (só no celular)</button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -397,151 +418,158 @@ input[type=file]{display:none}
 
 
 // ══════════════════════════════════════════════
-// SUPABASE SYNC
+// FIRESTORE SYNC (sistema DGFIBER: empresas/{empresaId}/postes_campo)
+// A ponte com o Firebase fica no <script type="module"> abaixo (window.__fbInit)
 // ══════════════════════════════════════════════
-const SUPABASE_URL = 'https://bkkvqvgmzxbsqzikacbv.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_wd0XnfsSS3Z4RvlfXQXOYQ_FbjGkA_U';
-let syncTimer = null;
+let FB = null, fbUser = null, fbPerfil = null, syncTimer = null, pushing = false;
 
-function sbH(){
+window.__fbInit = api => { FB = api; };
+
+// Chamado pelo módulo quando o login é confirmado e o vínculo (usuarios/{uid}) foi lido
+window.__fbLogin = (user, perfil) => {
+  fbUser = user; fbPerfil = perfil;
+  document.getElementById('lov').classList.remove('on');
+  if(!tech && perfil.nome){ tech = perfil.nome; localStorage.setItem('pgps_tech', tech); document.getElementById('techDisp').textContent = tech; }
+  updAccount();
+  FB.listen(perfil.empresaId, onCloudChanges, e => { console.error('listen', e); setSync('⚠️ Sem permissão de leitura', true); });
+  pushToCloud();
+};
+window.__fbLogout = () => {
+  fbUser = null; fbPerfil = null; updAccount();
+  if(!localStorage.getItem('pgps_semlogin')) document.getElementById('lov').classList.add('on');
+};
+
+function setSync(txt, er){
+  const el = document.getElementById('syncStatus');
+  if(el){ el.textContent = txt; el.style.color = er ? 'var(--rd)' : 'var(--mu)'; }
+}
+function updAccount(){
+  const el = document.getElementById('binIdDisp');
+  if(el) el.textContent = fbUser ? `${fbUser.email} · ${fbPerfil.empresaId}` : 'Não conectado — toque em Entrar';
+  const b = document.getElementById('btnConta');
+  if(b) b.textContent = fbUser ? 'Sair' : 'Entrar';
+  const n = poles.filter(p => p._dirty).length + pendingDeletes().length;
+  if(!fbUser) setSync('☁️ Faça login para sincronizar' + (n ? ` (${n} pendente${n>1?'s':''})` : ''), true);
+}
+
+// ID do documento no Firestore. Postes antigos usam o poleId (era a chave única no
+// banco anterior), assim o mesmo poste vindo de celulares diferentes não duplica.
+function docIdFor(p){
+  return p.uid || ('pid-' + String(p.poleId).replace(/[\/\s]+/g, '_'));
+}
+function newUid(){ return 'pg-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+
+function toCloud(p){
+  const fotos = (p.photos || []).map(ph => ph && ph.data ? ph.data : null);
   return {
-    'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
-    'Content-Type': 'application/json'
+    uid: p.uid,
+    poleId: p.poleId,
+    type: p.type || 'Concreto',
+    model: p.model || '',
+    lat: p.lat,
+    lng: p.lng,
+    tech: p.tech || '',
+    date: p.date || '',
+    obs: p.obs || '',
+    hasPhotos: fotos.filter(Boolean).length,
+    fotos_b64: fotos,
+    // histórico sem fotos para não estourar o limite de 1 MB por documento
+    history: (p.history || []).map(v => ({date: v.date || '', tech: v.tech || '', obs: v.obs || '', lat: v.lat ?? null, lng: v.lng ?? null}))
   };
 }
 
-async function uploadPhotoToStorage(base64data, filename) {
-  const base64 = base64data.split(',')[1];
-  const bytes = atob(base64);
-  const arr = new Uint8Array(bytes.length);
-  for(let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-  const blob = new Blob([arr], {type: 'image/jpeg'});
-  const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/poste-fotos/${filename}`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': 'image/jpeg',
-      'x-upsert': 'true'
-    },
-    body: blob
-  });
-  if(!resp.ok) throw new Error(await resp.text());
-  return `${SUPABASE_URL}/storage/v1/object/public/poste-fotos/${filename}`;
+function pendingDeletes(){ try{ return JSON.parse(localStorage.getItem('pgps_del') || '[]'); }catch(e){ return []; } }
+function queueDelete(uids){
+  const s = new Set(pendingDeletes()); uids.forEach(u => u && s.add(u));
+  localStorage.setItem('pgps_del', JSON.stringify([...s]));
 }
 
-async function savePhotosToRow(poleId, photos) {
-  if(!navigator.onLine) return;
-  const photos_data = (photos||[]).map(ph => ph ? {data: ph.data, name: ph.name||'foto.jpg'} : null);
-  if(!photos_data.some(Boolean)) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/postes?poleId=eq.${encodeURIComponent(poleId)}`, {
-    method: 'PATCH',
-    headers: {...sbH(), 'Prefer': 'return=minimal'},
-    body: JSON.stringify({photos_data})
-  });
-}
-
-async function pushToCloud() {
-  if(!navigator.onLine) return;
-  try {
-    const payload = poles.map(p => ({
-      poleId: p.poleId,
-      type: p.type || 'Concreto',
-      model: p.model || '',
-      lat: p.lat,
-      lng: p.lng,
-      tech: p.tech || '',
-      date: p.date || '',
-      obs: p.obs || '',
-      hasPhotos: (p.photos || []).filter(Boolean).length || (p.photo_urls || []).filter(Boolean).length,
-      photo_urls: p.photo_urls || [],
-      photos_data: (p.photos || []).map(ph => ph ? {data: ph.data, name: ph.name || 'foto.jpg'} : null),
-      history: p.history || []
-    }));
-    const resp = await fetch(SUPABASE_URL + '/rest/v1/postes?on_conflict=poleId', {
-      method: 'POST',
-      headers: {...sbH(), 'Prefer': 'resolution=merge-duplicates,return=minimal'},
-      body: JSON.stringify(payload)
-    });
-    if(!resp.ok) throw new Error(await resp.text());
-    const el=document.getElementById('syncStatus');
-    if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    const binEl=document.getElementById('binIdDisp');
-    if(binEl) binEl.textContent='Supabase ✅';
-  } catch(e) { console.error('push error',e); toast('⚠️ Erro ao sincronizar','er'); }
-}
-
-async function pullFromCloud() {
-  if(!navigator.onLine) return;
-  try {
-    const resp = await fetch(SUPABASE_URL + '/rest/v1/postes?select=*&order=created_at.asc', {
-      headers: sbH()
-    });
-    if(!resp.ok) throw new Error(await resp.text());
-    const rows = await resp.json();
-    let added = 0;
-    for(const row of rows){
-      if(!row.lat || !row.lng || !row.poleId) continue;
-      if(!poles.find(p => p.poleId === row.poleId)){
-        poles.push({
-          id: Date.now() + Math.random(),
-          poleId: row.poleId,
-          type: row.type || 'Concreto',
-          model: row.model || '',
-          lat: parseFloat(row.lat),
-          lng: parseFloat(row.lng),
-          tech: row.tech || '',
-          date: row.date || '',
-          obs: row.obs || '',
-          photos: Array.isArray(row.photos_data) && row.photos_data.some(Boolean) ? row.photos_data.map(ph=>ph||null) : [null,null],
-          photo_urls: Array.isArray(row.photo_urls) ? row.photo_urls : [],
-          history: Array.isArray(row.history) ? row.history : []
-        });
-        added++;
-      }
+async function pushToCloud(){
+  if(!FB || !fbUser || !navigator.onLine || pushing) { updAccount(); return; }
+  pushing = true;
+  const emp = fbPerfil.empresaId;
+  let ok = 0, fail = 0, lastErr = null;
+  try{
+    for(const uid of pendingDeletes()){
+      try{ await FB.remove(emp, uid); const s = pendingDeletes().filter(x => x !== uid); localStorage.setItem('pgps_del', JSON.stringify(s)); }
+      catch(e){ fail++; lastErr = e; }
     }
-    if(added > 0){ save(); renderList(); toast('☁️ '+added+' poste(s) carregado(s)!','ok'); }
-    const el=document.getElementById('syncStatus');
-    if(el) el.textContent='☁️ Sincronizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    const binEl=document.getElementById('binIdDisp');
-    if(binEl) binEl.textContent='Supabase ✅';
-  } catch(e) { console.error('pull error',e); }
+    for(const p of poles.filter(p => p._dirty)){
+      try{ await FB.upsert(emp, p.uid, toCloud(p), fbUser); p._dirty = false; ok++; }
+      catch(e){ fail++; lastErr = e; console.error('push', p.poleId, e); }
+    }
+    if(ok) save();
+    if(fail){
+      const perm = lastErr && String(lastErr.code || lastErr.message).includes('permission');
+      setSync(perm ? '⚠️ Sem permissão para gravar no sistema' : `⚠️ ${fail} poste(s) não enviados`, true);
+      toast(perm ? '⚠️ Sem permissão no Firestore' : '⚠️ Erro ao sincronizar', 'er');
+    } else {
+      setSync('☁️ Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
+      if(ok) toast(`☁️ ${ok} poste(s) enviados ao sistema`, 'ok');
+    }
+  } finally { pushing = false; }
 }
 
-function scheduleSync() {
+// Recebe alterações em tempo real da coleção postes_campo
+function onCloudChanges(changes){
+  let n = 0;
+  for(const {type, id, data: row} of changes){
+    const local = poles.find(p => p.uid === id);
+    if(type === 'removed'){
+      if(local && !local._dirty){ poles.splice(poles.indexOf(local), 1); n++; }
+      continue;
+    }
+    if(row.lat == null || row.lng == null || !row.poleId) continue;
+    if(local && local._dirty) continue; // alteração local ainda não enviada vence
+    const fotos = Array.isArray(row.fotos_b64) ? row.fotos_b64 : [];
+    const photos = [0, 1].map(i => fotos[i] ? {data: fotos[i], name: `foto${i+1}.jpg`, type: 'image/jpeg'} : null);
+    const fields = {
+      uid: id, poleId: row.poleId, type: row.type || 'Concreto', model: row.model || '',
+      lat: parseFloat(row.lat), lng: parseFloat(row.lng), tech: row.tech || '', date: row.date || '',
+      obs: row.obs || '', photos, history: Array.isArray(row.history) ? row.history : [], _dirty: false
+    };
+    if(local) Object.assign(local, fields);
+    else poles.push({id: Date.now() + Math.random(), ...fields});
+    n++;
+  }
+  if(n){ save(); renderList(); }
+  setSync('☁️ Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
+}
+
+async function pullFromCloud(){ return pushToCloud(); }
+
+function scheduleSync(){
+  updAccount();
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => { pushToCloud(); }, 2000);
 }
 
-// Migração: salva fotos antigas que estão no celular direto no banco
-async function migrateOldPhotos() {
-  if(!navigator.onLine) return;
-  if(localStorage.getItem('pgps_migrated_v5')) return;
-  const pending = poles.filter(p => (p.photos||[]).some(Boolean));
-  if(!pending.length){ localStorage.setItem('pgps_migrated_v5','1'); return; }
-  toast(`📤 Salvando fotos de ${pending.length} poste(s) na nuvem...`,'info');
-  let ok = 0;
-  for(const p of pending){
-    try{
-      await savePhotosToRow(p.poleId, p.photos);
-      ok++;
-    }catch(e){ console.warn('migrate',p.poleId,e); }
-  }
-  if(ok > 0) toast(`✅ ${ok} poste(s) com fotos salvos na nuvem!`,'ok');
-  localStorage.setItem('pgps_migrated_v5','1');
+// LOGIN
+async function doLogin(){
+  const email = V('lEmail').trim(), senha = V('lSenha');
+  if(!email || !senha){ toast('⚠️ Informe e-mail e senha', 'er'); return; }
+  if(!FB){ toast('Carregando... tente de novo', 'info'); return; }
+  const btn = document.getElementById('btnLogin');
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  try{
+    await FB.login(email, senha);
+    localStorage.removeItem('pgps_semlogin');
+    SV('lSenha', '');
+  }catch(e){
+    const m = {'auth/invalid-credential':'E-mail ou senha incorretos', 'auth/invalid-email':'E-mail inválido', 'auth/too-many-requests':'Muitas tentativas, aguarde', 'auth/network-request-failed':'Sem conexão'};
+    toast('❌ ' + (m[e.code] || e.message), 'er');
+  }finally{ btn.disabled = false; btn.textContent = 'Entrar'; }
 }
-
-function copyBinId() {
-  const txt = SUPABASE_URL + '/rest/v1/postes';
-  navigator.clipboard.writeText(txt).then(() => toast('📋 URL copiada!','ok')).catch(() => {
-    const el = document.getElementById('binIdDisp');
-    toast('📋 ' + (el ? el.textContent : txt), 'ok');
-  });
+function skipLogin(){
+  localStorage.setItem('pgps_semlogin', '1');
+  document.getElementById('lov').classList.remove('on');
+  toast('Modo offline — postes ficam só no celular', 'info');
 }
-
-// Auto-pull every 30s when online
-setInterval(() => { if(navigator.onLine) pullFromCloud(); }, 30000);
+function toggleConta(){
+  if(fbUser){ if(confirm('Sair da conta? Os postes continuam salvos no celular.')) FB.logout(); }
+  else { localStorage.removeItem('pgps_semlogin'); document.getElementById('lov').classList.add('on'); }
+}
+document.addEventListener('keydown', e => { if(e.key === 'Enter' && document.getElementById('lov').classList.contains('on')) doLogin(); });
 
 function getNextId(){
   if(!poles.length) return 'P-001';
@@ -574,6 +602,10 @@ function init(){
   try{
     const s=localStorage.getItem('pgps4');
     if(s) poles=JSON.parse(s);
+    // Migração: postes sem uid (versão Supabase) ganham uid e são reenviados ao sistema
+    let mig=false;
+    poles.forEach(p=>{ if(!p.uid){ p.uid=docIdFor(p); p._dirty=true; mig=true; } });
+    if(mig) save();
     tech=localStorage.getItem('pgps_tech')||'';
     if(tech) document.getElementById('techDisp').textContent=tech;
     loadDraft();
@@ -583,9 +615,9 @@ function init(){
     if(!sa&&!localStorage.getItem('pwa_closed'))
       document.getElementById('banPwa').classList.add('on');
   }catch(e){}
-  pullFromCloud().then(()=>migrateOldPhotos());
+  updAccount();
   window.addEventListener('offline',()=>document.getElementById('banOff').classList.add('on'));
-  window.addEventListener('online',()=>document.getElementById('banOff').classList.remove('on'));
+  window.addEventListener('online',()=>{document.getElementById('banOff').classList.remove('on');pushToCloud();});
   if(!navigator.onLine) document.getElementById('banOff').classList.add('on');
 }
 function closePwa(){localStorage.setItem('pwa_closed','1');document.getElementById('banPwa').classList.remove('on');}
@@ -807,34 +839,18 @@ async function addPole(){
   if(!poleId){toast('⚠️ Informe o ID do poste','er');return;}
   if(isNaN(lat)||isNaN(lng)){toast('⚠️ Capture a localização GPS primeiro','er');return;}
 
-  // Upload photos to Supabase Storage
-  let photoUrls = [null, null];
-  const hasLocalPhotos = pd[1] || pd[2];
-  if(hasLocalPhotos && navigator.onLine){
-    toast('📤 Enviando fotos...','info');
-    const safeId = poleId.replace(/[^\w-]/g,'_');
-    const uploads = [1,2].map(async n => {
-      if(!pd[n]) return null;
-      try{
-        const fname = `${safeId}_foto${n}_${Date.now()}.jpg`;
-        return await uploadPhotoToStorage(pd[n].data, fname);
-      }catch(e){ console.warn('upload foto',n,e); return null; }
-    });
-    photoUrls = await Promise.all(uploads);
-  }
-
   const localPhotos = [pd[1]?{...pd[1]}:null, pd[2]?{...pd[2]}:null];
   const ex=poles.find(p=>p.poleId===poleId);
   if(ex){
     if(!ex.history)ex.history=[];
-    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:localPhotos,photo_urls:photoUrls,lat,lng});
-    ex.lat=lat;ex.lng=lng;
+    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:localPhotos,lat,lng});
+    ex.lat=lat;ex.lng=lng;ex._dirty=true;
     if(localPhotos.some(Boolean)) ex.photos=localPhotos;
     save();renderList();clearDraftS();resetForm();
     scheduleSync();
     toast(`🔄 Nova visita: ${poleId}!`,'ok');goTab('lista');return;
   }
-  poles.push({id:Date.now(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:localPhotos,photo_urls:photoUrls,date:new Date().toLocaleString('pt-BR'),history:[]});
+  poles.push({id:Date.now(),uid:newUid(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:localPhotos,date:new Date().toLocaleString('pt-BR'),history:[],_dirty:true});
   save();renderList();clearDraftS();resetForm();
   scheduleSync();
   toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
@@ -922,16 +938,12 @@ function confirmDel(){if(confirm('Remover este poste?')){delById(curId);closeMod
 function clearAll(){
   if(!poles.length){toast('Nenhum poste para limpar','info');return;}
   if(confirm('Limpar TODOS os '+poles.length+' postes? Esta ação não pode ser desfeita.')){
-    const ids=poles.map(p=>p.poleId);
+    queueDelete(poles.map(p=>p.uid));
     poles.length=0;
     save();
     renderList();
     toast('🗑 Histórico limpo!','info');
-    if(navigator.onLine){
-      fetch(SUPABASE_URL+'/rest/v1/postes?poleId=in.('+ids.map(id=>'"'+id+'"').join(',')+')',{
-        method:'DELETE',headers:sbH()
-      }).catch(e=>console.error('delete all error',e));
-    }
+    scheduleSync();
   }
 }
 
@@ -939,15 +951,12 @@ function delById(id){
   const i=poles.findIndex(p=>p.id===id);
   if(i<0)return;
   const nm=poles[i].poleId;
+  queueDelete([poles[i].uid]);
   poles.splice(i,1);
   save();
   renderList();
   toast(`🗑 ${nm} removido`,'info');
-  if(navigator.onLine){
-    fetch(SUPABASE_URL+'/rest/v1/postes?poleId=eq.'+encodeURIComponent(nm),{
-      method:'DELETE',headers:sbH()
-    }).catch(e=>console.error('delete error',e));
-  }
+  scheduleSync();
 }
 
 // KML/KMZ/PDF
@@ -1041,6 +1050,52 @@ let tt;
 function toast(msg,type='info'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type} show`;clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3200);}
 
 init();
+</script>
+<script type="module">
+// Ponte com o Firebase do sistema DGFIBER (mesmo projeto de sistema.dgfiberprojetos.com.br)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyBirmhjktEUWxWtcNWl6CJiA7u7PWMn1YI",
+  authDomain: "dgfiberprojetos-73caa.firebaseapp.com",
+  projectId: "dgfiberprojetos-73caa",
+  storageBucket: "dgfiberprojetos-73caa.firebasestorage.app",
+  messagingSenderId: "852601778747",
+  appId: "1:852601778747:web:adb0f26ae68a2659d0a21e"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+const col = emp => collection(db, 'empresas', emp, 'postes_campo');
+let unsub = null;
+
+window.__fbInit({
+  login: (email, senha) => signInWithEmailAndPassword(auth, email, senha),
+  logout: () => signOut(auth),
+  upsert: (emp, uid, data, user) => setDoc(doc(col(emp), uid),
+    {...data, autorUid: user.uid, autorEmail: user.email || '', atualizadoEm: serverTimestamp()}, {merge: true}),
+  remove: (emp, uid) => deleteDoc(doc(col(emp), uid)),
+  listen: (emp, onChanges, onError) => {
+    if(unsub) unsub();
+    unsub = onSnapshot(col(emp), snap => {
+      onChanges(snap.docChanges().map(c => ({type: c.type, id: c.doc.id, data: c.doc.data()})));
+    }, onError);
+  }
+});
+
+onAuthStateChanged(auth, async user => {
+  if(!user){ if(unsub){ unsub(); unsub = null; } window.__fbLogout(); return; }
+  try{
+    const s = await getDoc(doc(db, 'usuarios', user.uid));
+    const d = s.exists() ? s.data() : {};
+    window.__fbLogin(user, {empresaId: d.empresaId || 'dg-fiber', papel: d.papel || 'campo', nome: d.nome || ''});
+  }catch(e){
+    console.error('vínculo', e);
+    toast('⚠️ Não foi possível ler seu cadastro no sistema', 'er');
+    window.__fbLogin(user, {empresaId: 'dg-fiber', papel: 'campo', nome: ''});
+  }
+});
 </script>
 </body>
 </html>
