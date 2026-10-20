@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- PosteGPS v5.1 - 2026-10-20 - GPS espera precisão boa e grava precisao_m -->
+<!-- PosteGPS v5.2 - 2026-10-20 - GPS com precisão; celular guarda só fotos pendentes -->
 <title>PosteGPS</title>
 
 <!-- Preload libs so they get cached on first visit -->
@@ -474,8 +474,9 @@ function toCloud(p){
     tech: p.tech || '',
     date: p.date || '',
     obs: p.obs || '',
-    hasPhotos: fotos.filter(Boolean).length,
-    fotos_b64: fotos,
+    // sem foto no celular (ex.: poste já enviado e aberto offline): não manda o campo,
+    // assim o merge do Firestore mantém as fotos que já estão no sistema
+    ...(fotos.some(Boolean) ? {hasPhotos: fotos.filter(Boolean).length, fotos_b64: fotos} : {}),
     // histórico sem fotos para não estourar o limite de 1 MB por documento
     history: (p.history || []).map(v => ({date: v.date || '', tech: v.tech || '', obs: v.obs || '', lat: v.lat ?? null, lng: v.lng ?? null}))
   };
@@ -634,16 +635,15 @@ function init(){
 }
 function closePwa(){localStorage.setItem('pwa_closed','1');document.getElementById('banPwa').classList.remove('on');}
 function save(){
+  // O navegador só guarda ~5 MB por site. As fotos de postes já enviados estão no sistema
+  // (e voltam pelo onSnapshot), então no celular só ficam as fotos dos postes PENDENTES.
+  const semFotos=p=>({...p,photos:[null,null],fotos_b64:undefined,history:(p.history||[]).map(v=>({...v,photos:undefined}))});
   try{
-    // Save poles without photos to avoid memory issues
-    // Photos are kept in memory only during session
-    localStorage.setItem('pgps4',JSON.stringify(poles));
+    localStorage.setItem('pgps4',JSON.stringify(poles.map(p=>p._dirty?p:semFotos(p))));
   }catch(e){
-    // If storage full, save without photos
     try{
-      const lite=poles.map(p=>({...p,photos:[null,null]}));
-      localStorage.setItem('pgps4',JSON.stringify(lite));
-      toast('⚠️ Memória cheia — fotos não salvas localmente','info');
+      localStorage.setItem('pgps4',JSON.stringify(poles.map(semFotos)));
+      toast('⚠️ Memória cheia — sincronize para não perder fotos pendentes','er');
     }catch(e2){
       toast('❌ Armazenamento cheio!','er');
     }
