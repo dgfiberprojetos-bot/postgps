@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- PosteGPS v5.0 - 2026-10-19 - sincroniza com o Firestore do sistema DGFIBER -->
+<!-- PosteGPS v5.1 - 2026-10-20 - GPS espera precisão boa e grava precisao_m -->
 <title>PosteGPS</title>
 
 <!-- Preload libs so they get cached on first visit -->
@@ -470,6 +470,7 @@ function toCloud(p){
     model: p.model || '',
     lat: p.lat,
     lng: p.lng,
+    precisao_m: p.acc ?? null,
     tech: p.tech || '',
     date: p.date || '',
     obs: p.obs || '',
@@ -527,7 +528,7 @@ function onCloudChanges(changes){
     const photos = [0, 1].map(i => fotos[i] ? {data: fotos[i], name: `foto${i+1}.jpg`, type: 'image/jpeg'} : null);
     const fields = {
       uid: id, poleId: row.poleId, type: row.type || 'Concreto', model: row.model || '',
-      lat: parseFloat(row.lat), lng: parseFloat(row.lng), tech: row.tech || '', date: row.date || '',
+      lat: parseFloat(row.lat), lng: parseFloat(row.lng), acc: row.precisao_m ?? null, tech: row.tech || '', date: row.date || '',
       obs: row.obs || '', photos, history: Array.isArray(row.history) ? row.history : [], _dirty: false
     };
     if(local) Object.assign(local, fields);
@@ -753,32 +754,66 @@ function saveTech(){
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('tov').classList.contains('on'))saveTech();});
 
 // GPS
+// O primeiro ponto que o celular devolve costuma vir da antena/Wi-Fi (erro de 50 m a vários km).
+// Por isso acompanhamos o GPS por até GPS_MAX_S segundos e ficamos com a leitura mais precisa,
+// parando antes se chegar a GPS_BOM_M metros.
+const GPS_BOM_M=8, GPS_ACEITAVEL_M=20, GPS_MAX_S=45;
+let gpsWatch=null, gpsTimer=null, gpsBest=null, gpsAcc=null;
+function pararGPS(){ if(gpsWatch!==null) navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; clearInterval(gpsTimer); gpsTimer=null; }
 function getGPS(){
   if(!navigator.geolocation){toast('GPS não suportado','er');return;}
   const btn=document.getElementById('btnGPS'),dot=document.getElementById('gdot'),txt=document.getElementById('gtxt');
-  btn.classList.add('ld');btn.innerHTML='⏳ Aguarde...';dot.className='gdot';txt.textContent='Conectando ao GPS...';
-  navigator.geolocation.getCurrentPosition(
+  if(gpsWatch!==null){ finalizarGPS(); return; } // segundo toque = usar a melhor leitura até agora
+  gpsBest=null; gpsAcc=null;
+  const t0=Date.now();
+  btn.innerHTML='⏳ Buscando satélites… toque para usar a atual';dot.className='gdot';txt.textContent='Fique parado ao lado do poste, a céu aberto…';
+  gpsTimer=setInterval(()=>{
+    const s=Math.round((Date.now()-t0)/1000);
+    if(!gpsBest) txt.textContent=`Procurando GPS… ${s}s`;
+    if(s>=GPS_MAX_S) finalizarGPS();
+  },1000);
+  gpsWatch=navigator.geolocation.watchPosition(
     pos=>{
-      const la=pos.coords.latitude.toFixed(6),ln=pos.coords.longitude.toFixed(6),ac=Math.round(pos.coords.accuracy);
-      SV('lat',la);SV('lng',ln);
-      dot.className='gdot ok';txt.textContent=`${la}, ${ln}  (±${ac}m)`;
-      btn.classList.remove('ld');btn.innerHTML='<span style="font-size:20px">✅</span> GPS Capturado — Toque para recapturar';
-      showMap(la,ln);saveDraft();toast('📍 Localização capturada!','ok');
-      // Auto-fill ID if empty
-      if(!document.getElementById('poleId').value){ SV('poleId', getNextId()); }
-      // Get address async
-      getAddress(la,ln).then(addr=>{ if(addr){ document.getElementById('addrDisp').textContent='📍 '+addr; document.getElementById('addrWrap').style.display='block'; } });
+      const ac=pos.coords.accuracy;
+      if(!gpsBest || ac<gpsBest.coords.accuracy) gpsBest=pos;
+      const b=Math.round(gpsBest.coords.accuracy);
+      dot.className='gdot'+(b<=GPS_ACEITAVEL_M?' ok':'');
+      txt.textContent=`Precisão atual ±${Math.round(ac)} m · melhor ±${b} m (meta ≤${GPS_BOM_M} m)`;
+      if(gpsBest.coords.accuracy<=GPS_BOM_M) finalizarGPS();
     },
     err=>{
-      const m={1:'Permissão negada. Ative nas configurações.',2:'Localização indisponível.',3:'Tempo esgotado.'};
+      if(gpsBest) return; // já temos leitura, ignora falha pontual
+      pararGPS();
+      const m={1:'Permissão negada. Ative a localização PRECISA para o navegador.',2:'Localização indisponível. Ligue o GPS do celular.',3:'Tempo esgotado.'};
       dot.className='gdot er';txt.textContent=m[err.code]||'Erro';
       btn.classList.remove('ld');btn.innerHTML='<span style="font-size:20px">📍</span> Tentar Novamente';
       toast('❌ '+(m[err.code]||'Erro GPS'),'er');
     },
-    {enableHighAccuracy:true,timeout:20000,maximumAge:0}
+    {enableHighAccuracy:true,timeout:GPS_MAX_S*1000,maximumAge:0}
   );
 }
-function onCC(){const la=V('lat'),ln=V('lng');if(la&&ln&&!isNaN(la)&&!isNaN(ln))showMap(la,ln);saveDraft();}
+function finalizarGPS(){
+  const btn=document.getElementById('btnGPS'),dot=document.getElementById('gdot'),txt=document.getElementById('gtxt');
+  pararGPS();
+  if(!gpsBest){
+    dot.className='gdot er';txt.textContent='Sem sinal de GPS. Vá para um local aberto e tente de novo.';
+    btn.innerHTML='<span style="font-size:20px">📍</span> Tentar Novamente';toast('❌ Sem sinal de GPS','er');return;
+  }
+  const la=gpsBest.coords.latitude.toFixed(6),ln=gpsBest.coords.longitude.toFixed(6),ac=Math.round(gpsBest.coords.accuracy);
+  gpsAcc=ac;
+  SV('lat',la);SV('lng',ln);
+  const ruim=ac>GPS_ACEITAVEL_M;
+  dot.className='gdot '+(ruim?'er':'ok');
+  txt.textContent=`${la}, ${ln}  (±${ac} m)`+(ruim?' — IMPRECISO':'');
+  btn.innerHTML=ruim?'<span style="font-size:20px">⚠️</span> Precisão ruim — toque para tentar de novo':'<span style="font-size:20px">✅</span> GPS Capturado — Toque para recapturar';
+  showMap(la,ln);saveDraft();
+  if(ac>500) toast('⚠️ Localização APROXIMADA: ative "Localização precisa" para o navegador','er');
+  else if(ruim) toast(`⚠️ Precisão ±${ac} m — aguarde mais ou vá para céu aberto`,'er');
+  else toast(`📍 Localização capturada (±${ac} m)`,'ok');
+  if(!document.getElementById('poleId').value){ SV('poleId', getNextId()); }
+  getAddress(la,ln).then(addr=>{ if(addr){ document.getElementById('addrDisp').textContent='📍 '+addr; document.getElementById('addrWrap').style.display='block'; } });
+}
+function onCC(){gpsAcc=null;const la=V('lat'),ln=V('lng');if(la&&ln&&!isNaN(la)&&!isNaN(ln))showMap(la,ln);saveDraft();}
 function showMap(lat,lng){
   const wrap = document.getElementById('mmap');
   wrap.style.display='block';
@@ -849,25 +884,28 @@ async function addPole(){
   const poleId=V('poleId').trim(),type=V('poleType'),model=V('poleModel'),lat=parseFloat(V('lat')),lng=parseFloat(V('lng')),obs=V('poleObs').trim();
   if(!poleId){toast('⚠️ Informe o ID do poste','er');return;}
   if(isNaN(lat)||isNaN(lng)){toast('⚠️ Capture a localização GPS primeiro','er');return;}
+  if(gpsWatch!==null) finalizarGPS();
+  if(gpsAcc!==null && gpsAcc>GPS_ACEITAVEL_M && !confirm(`A precisão do GPS está ruim (±${gpsAcc} m). O poste pode ficar fora do lugar no mapa.\n\nSalvar mesmo assim?`)) return;
+  const acc=gpsAcc;
 
   const localPhotos = [pd[1]?{...pd[1]}:null, pd[2]?{...pd[2]}:null];
   const ex=poles.find(p=>p.poleId===poleId);
   if(ex){
     if(!ex.history)ex.history=[];
-    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:localPhotos,lat,lng});
-    ex.lat=lat;ex.lng=lng;ex._dirty=true;
+    ex.history.push({date:new Date().toLocaleString('pt-BR'),tech:tech||'Não identificado',obs,photos:localPhotos,lat,lng,acc});
+    ex.lat=lat;ex.lng=lng;ex.acc=acc;ex._dirty=true;
     if(localPhotos.some(Boolean)) ex.photos=localPhotos;
     save();renderList();clearDraftS();resetForm();
     scheduleSync();
     toast(`🔄 Nova visita: ${poleId}!`,'ok');goTab('lista');return;
   }
-  poles.push({id:Date.now(),uid:newUid(),poleId,type,model,lat,lng,obs,tech:tech||'Não identificado',photos:localPhotos,date:new Date().toLocaleString('pt-BR'),history:[],_dirty:true});
+  poles.push({id:Date.now(),uid:newUid(),poleId,type,model,lat,lng,acc,obs,tech:tech||'Não identificado',photos:localPhotos,date:new Date().toLocaleString('pt-BR'),history:[],_dirty:true});
   save();renderList();clearDraftS();resetForm();
   scheduleSync();
   toast(`✅ Poste ${poleId} salvo!`,'ok');goTab('lista');
 }
 
-function resetForm(){ clearDraftS();
+function resetForm(){ clearDraftS(); pararGPS(); gpsAcc=null;
   ['poleId','poleObs','lat','lng'].forEach(id=>SV(id,''));  onTypeChange();
   document.getElementById('gdot').className='gdot';
   document.getElementById('gtxt').textContent='Toque para capturar a localização';
@@ -890,7 +928,7 @@ function renderList(){
       <div class="pn">${i+1}</div>
       <div class="pbody">
         <h3>${p.poleId} <span style="color:var(--mu);font-weight:500;font-size:12px">— ${p.type}${p.model?' · '+p.model:''}</span></h3>
-        <div class="pmeta">📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>🕐 ${p.date}</div>
+        <div class="pmeta">📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}${p.acc!=null?` <span style="color:${p.acc>GPS_ACEITAVEL_M?'var(--rd)':'var(--gn)'}">±${p.acc} m</span>`:''}<br>🕐 ${p.date}</div>
         <div class="ptags">
           ${p.tech?`<span class="ptag2 ptag-t">👷 ${p.tech}</span>`:''}
           ${v>0?`<span class="ptag2 ptag-v">🔄 ${v} visita${v>1?'s':''}</span>`:''}
@@ -929,7 +967,7 @@ function viewPole(id){
       offMsg2.style.display='flex';
     }
   } else mm.style.display='none';
-  document.getElementById('mInfo').innerHTML=`<strong>ID:</strong> ${p.poleId}<br><strong>Tipo:</strong> ${p.type}<br><strong>Modelo:</strong> ${p.model||"Não informado"}<br><strong>Técnico:</strong> ${p.tech||'N/A'}<br><strong>Lat:</strong> ${p.lat}<br><strong>Lng:</strong> ${p.lng}<br><strong>Data:</strong> ${p.date}<br>${p.obs?`<strong>Obs:</strong> ${p.obs}`:''}`;
+  document.getElementById('mInfo').innerHTML=`<strong>ID:</strong> ${p.poleId}<br><strong>Tipo:</strong> ${p.type}<br><strong>Modelo:</strong> ${p.model||"Não informado"}<br><strong>Técnico:</strong> ${p.tech||'N/A'}<br><strong>Lat:</strong> ${p.lat}<br><strong>Lng:</strong> ${p.lng}<br>${p.acc!=null?`<strong>Precisão GPS:</strong> ±${p.acc} m<br>`:''}<strong>Data:</strong> ${p.date}<br>${p.obs?`<strong>Obs:</strong> ${p.obs}`:''}`;
   const hw=document.getElementById('mHW'),hist=p.history||[];
   if(hist.length){
     hw.style.display='block';
