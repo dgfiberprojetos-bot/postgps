@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- PosteGPS v5.2 - 2026-10-20 - GPS com precisão; celular guarda só fotos pendentes -->
+<!-- PosteGPS v5.3 - 2026-10-30 - KMZ volta a ter fotos nomeadas pelo poste (files/foto_ID_n.jpg) -->
 <title>PosteGPS</title>
 
 <!-- Preload libs so they get cached on first visit -->
@@ -1009,13 +1009,23 @@ function delById(id){
 }
 
 // KML/KMZ/PDF
-function buildKML(inline){
+// Nome do arquivo de cada foto dentro do KMZ: files/foto_P-001_1.jpg (pelo ID do poste).
+// Se dois postes tiverem o mesmo ID (técnicos diferentes), o segundo ganha sufixo _b, _c...
+function nomesFotosKMZ(){
+  const usados=new Set(), mapa=new Map();
+  for(const p of poles){
+    const base=String(p.poleId||'poste').replace(/[^\w-]/g,'_');
+    let id=base, k=1;
+    while(usados.has(id)) id=base+'_'+String.fromCharCode(97+k++);
+    usados.add(id);
+    mapa.set(p,(p.photos||[]).map((x,i)=>x&&x.data?`foto_${id}_${i+1}.jpg`:null));
+  }
+  return mapa;
+}
+function buildKML(nomes){
   const ps=poles.map(p=>{
-    // inline=true: embed fotos como base64 direto no KML (funciona no Google Earth)
-    const ph=(p.photos||[]).map(x=>{
-      if(!x||!x.data)return'';
-      return`<img src="${x.data}" width="350"><br>`;
-    }).join('');
+    // KMZ: fotos como arquivos separados (files/foto_<ID>_<n>.jpg). KML puro: sem fotos.
+    const ph=nomes?(nomes.get(p)||[]).filter(Boolean).map(fn=>`<img src="files/${fn}" width="350"><br>`).join(''):'';
     return`<Placemark><name>${p.poleId}</name><styleUrl>#p</styleUrl><description><![CDATA[<b>Tipo:</b> ${p.type}<br><b>Modelo:</b> ${p.model||'N/A'}<br><b>Técnico:</b> ${p.tech||'N/A'}<br><b>Data:</b> ${p.date}<br>${p.obs?`<b>Obs:</b> ${p.obs}<br>`:''}${ph}]]></description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
   }).join('');
   return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Postes</name><Style id="p"><IconStyle><color>ff23a0f5</color><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>${ps}</Document></kml>`;
@@ -1026,11 +1036,14 @@ async function exportKMZ(){
   if(typeof JSZip==='undefined'){toast('Carregando...','info');setTimeout(exportKMZ,1000);return;}
   toast('📦 Gerando KMZ...','info');
   try{
-    const zip=new JSZip();
-    // Fotos embutidas direto no KML como base64 — funciona garantido no Google Earth
-    zip.file('doc.kml',buildKML(true));
+    const zip=new JSZip(), pasta=zip.folder('files'), nomes=nomesFotosKMZ();
+    let total=0;
+    for(const p of poles) (p.photos||[]).forEach((ph,i)=>{
+      const fn=nomes.get(p)[i]; if(!fn) return;
+      pasta.file(fn, ph.data.split(',')[1], {base64:true}); total++;
+    });
+    zip.file('doc.kml',buildKML(nomes));
     const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
-    const total=poles.reduce((s,p)=>s+(p.photos||[]).filter(Boolean).length,0);
     dl(blob,'postes.kmz');
     toast(`✅ KMZ: ${poles.length} postes, ${total} foto(s)!`,'ok');
   }catch(e){toast('❌ Erro KMZ','er');}
